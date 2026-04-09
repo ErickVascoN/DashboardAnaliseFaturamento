@@ -653,6 +653,196 @@ def chart_layout(fig: go.Figure) -> go.Figure:
     return fig
 
 
+def render_presentation_mode(
+    df_f: pd.DataFrame,
+    mensal: pd.DataFrame,
+    alerts: list[dict[str, str]],
+    forecast_df: pd.DataFrame,
+    meta_mensal: float,
+    receita_total: float,
+    quantidade_total: float,
+    pedidos_unicos: int,
+    ticket_medio_pedido: float,
+    top_cliente_name: str,
+    top_cliente_share: float,
+    top_prod_name: str,
+    mensal_last: float,
+    media_3m: float,
+    gap_meta: float,
+) -> None:
+    st.markdown("### Modo Apresentação")
+    st.caption("Fluxo guiado para reunião executiva: avance pelas etapas e apresente com foco em decisão.")
+
+    etapa = st.radio(
+        "Etapa da apresentação",
+        ["Panorama", "Riscos", "Oportunidades", "Plano"],
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+
+    if etapa == "Panorama":
+        k1, k2, k3, k4 = st.columns(4)
+        k1.metric("Faturamento", to_brl(receita_total))
+        k2.metric("Volume", to_int(quantidade_total))
+        k3.metric("Pedidos", to_int(pedidos_unicos))
+        k4.metric("Ticket", to_brl(ticket_medio_pedido))
+
+        fig = go.Figure()
+        fig.add_trace(
+            go.Scatter(
+                x=mensal["ano_mes"],
+                y=mensal["faturamento"],
+                mode="lines+markers",
+                name="Faturamento",
+                line=dict(color=COLORS["primary"], width=4),
+            )
+        )
+        fig.add_trace(
+            go.Bar(
+                x=mensal["ano_mes"],
+                y=mensal["quantidade"],
+                name="Volume",
+                marker_color="rgba(244,162,97,0.38)",
+            )
+        )
+        fig.update_layout(title="Panorama Mensal de Receita e Volume")
+        st.plotly_chart(chart_layout(fig), use_container_width=True)
+
+        st.markdown(
+            (
+                f"**Mensagem-chave:** no recorte atual, o último mês fechou em {to_brl(mensal_last)} "
+                f"(média de 3 meses: {to_brl(media_3m)})."
+            )
+        )
+
+    elif etapa == "Riscos":
+        render_alerts(alerts)
+
+        top_clientes = (
+            df_f.groupby("destinatario", as_index=False)["valor_total"]
+            .sum()
+            .sort_values("valor_total", ascending=False)
+            .head(8)
+        )
+        fig_risk = px.bar(
+            top_clientes.sort_values("valor_total"),
+            x="valor_total",
+            y="destinatario",
+            orientation="h",
+            title="Concentração de Receita - Top 8 Clientes",
+            color="valor_total",
+            color_continuous_scale=["#FCE4D8", "#F4A261", "#E76F51"],
+            labels={"valor_total": "Receita (R$)", "destinatario": "Cliente"},
+        )
+        st.plotly_chart(chart_layout(fig_risk), use_container_width=True)
+
+    elif etapa == "Oportunidades":
+        c1, c2 = st.columns(2)
+
+        produto_perf = (
+            df_f.groupby("descricao_produto", as_index=False)["valor_total"]
+            .sum()
+            .sort_values("valor_total", ascending=False)
+            .head(12)
+        )
+        estado_perf = (
+            df_f.groupby("estado", as_index=False)["valor_total"]
+            .sum()
+            .sort_values("valor_total", ascending=False)
+        )
+
+        with c1:
+            fig_prod = px.bar(
+                produto_perf.sort_values("valor_total"),
+                x="valor_total",
+                y="descricao_produto",
+                orientation="h",
+                title="Top Produtos para Escalar Receita",
+                color="valor_total",
+                color_continuous_scale=["#D7EFEA", "#2A9D8F", "#1D3557"],
+                labels={"valor_total": "Receita (R$)", "descricao_produto": "Produto"},
+            )
+            st.plotly_chart(chart_layout(fig_prod), use_container_width=True)
+
+        with c2:
+            fig_geo = px.bar(
+                estado_perf,
+                x="estado",
+                y="valor_total",
+                title="Estados com Maior Potencial de Crescimento",
+                color="valor_total",
+                color_continuous_scale=["#D6EAF8", "#0C6E74", "#1D3557"],
+                labels={"valor_total": "Receita (R$)", "estado": "Estado"},
+            )
+            st.plotly_chart(chart_layout(fig_geo), use_container_width=True)
+
+        st.markdown(
+            f"**Mensagem-chave:** maior alavanca atual está em {top_prod_name}, e o cliente líder é {top_cliente_name} ({to_pct(top_cliente_share)} da receita)."
+        )
+
+    else:
+        left, right = st.columns([1, 2])
+
+        with left:
+            fig_gauge = go.Figure(
+                go.Indicator(
+                    mode="gauge+number",
+                    value=float(mensal_last),
+                    number={"prefix": "R$ "},
+                    title={"text": "Meta Mensal"},
+                    gauge={
+                        "axis": {"range": [0, max(meta_mensal * 1.5, mensal_last * 1.2 + 1)]},
+                        "bar": {"color": COLORS["primary"]},
+                        "steps": [
+                            {"range": [0, meta_mensal * 0.85], "color": "#ffd6cc"},
+                            {"range": [meta_mensal * 0.85, meta_mensal], "color": "#ffe9bf"},
+                            {"range": [meta_mensal, max(meta_mensal * 1.5, mensal_last * 1.2 + 1)], "color": "#d8f3dc"},
+                        ],
+                        "threshold": {
+                            "line": {"color": COLORS["accent"], "width": 4},
+                            "thickness": 0.75,
+                            "value": meta_mensal,
+                        },
+                    },
+                )
+            )
+            fig_gauge.update_layout(height=320)
+            st.plotly_chart(chart_layout(fig_gauge), use_container_width=True)
+
+        with right:
+            if forecast_df.empty:
+                st.info("Sem meses suficientes para previsão no recorte atual.")
+            else:
+                fig_forecast = go.Figure()
+                fig_forecast.add_trace(
+                    go.Scatter(
+                        x=mensal["ano_mes"],
+                        y=mensal["faturamento"],
+                        mode="lines+markers",
+                        name="Histórico",
+                        line=dict(color=COLORS["secondary"], width=3),
+                    )
+                )
+                fig_forecast.add_trace(
+                    go.Scatter(
+                        x=forecast_df["ano_mes"],
+                        y=forecast_df["faturamento_previsto"],
+                        mode="lines+markers",
+                        name="Previsão",
+                        line=dict(color=COLORS["primary"], width=3, dash="dot"),
+                    )
+                )
+                fig_forecast.update_layout(title="Previsão de Receita - 4 Meses")
+                st.plotly_chart(chart_layout(fig_forecast), use_container_width=True)
+
+        st.markdown("**Plano de ação recomendado:**")
+        st.markdown("1. Defender as contas estratégicas e reduzir concentração com novas contas de médio porte.")
+        st.markdown("2. Priorizar os produtos líderes com maior margem e maior giro.")
+        st.markdown(
+            f"3. {'Ativar plano comercial para recuperar' if gap_meta < 0 else 'Sustentar ritmo e elevar rentabilidade com mix premium'} {to_brl(abs(gap_meta))} {'abaixo' if gap_meta < 0 else 'acima'} da meta."
+        )
+
+
 def main() -> None:
     inject_styles()
 
@@ -670,6 +860,7 @@ def main() -> None:
         st.title("Configuração")
         sheet_url = st.text_input("Link da planilha Google Sheets", value=DEFAULT_SHEET_URL)
         refresh_click = st.button("Atualizar dados agora", use_container_width=True)
+        modo_apresentacao = st.toggle("Modo Apresentação", value=False)
         st.caption("Atualização automática em cache a cada 5 minutos.")
 
     if refresh_click:
@@ -765,24 +956,6 @@ def main() -> None:
     forecast_df = build_forecast(mensal, periods=4)
     alerts = build_alerts(df_f, cliente_limit=limite_cliente, vendedor_limit=limite_vendedor)
 
-    c1, c2, c3, c4, c5, c6 = st.columns(6)
-    with c1:
-        st.markdown(kpi_card("Faturamento", to_brl(receita_total), "Receita no período", delta_receita), unsafe_allow_html=True)
-    with c2:
-        st.markdown(kpi_card("Volume", to_int(quantidade_total), "Unidades faturadas", delta_volume), unsafe_allow_html=True)
-    with c3:
-        st.markdown(kpi_card("Pedidos", to_int(pedidos_unicos), "Pedidos únicos"), unsafe_allow_html=True)
-    with c4:
-        st.markdown(kpi_card("Ticket por Pedido", to_brl(ticket_medio_pedido), "Média por pedido"), unsafe_allow_html=True)
-    with c5:
-        st.markdown(kpi_card("Preço Médio", to_brl(preco_medio_ponderado), "Valor por unidade"), unsafe_allow_html=True)
-    with c6:
-        st.markdown(kpi_card("Clientes Ativos", to_int(clientes_ativos), f"{to_int(produtos_ativos)} produtos ativos"), unsafe_allow_html=True)
-
-    insights = generate_insights(df_f)
-    st.markdown('<div class="insight-box">' + "".join([f"<p>• {i}</p>" for i in insights]) + "</div>", unsafe_allow_html=True)
-
-    st.subheader("Narrativa Executiva em 60 Segundos")
     top_cliente_row = (
         df_f.groupby("destinatario", as_index=False)["valor_total"]
         .sum()
@@ -803,6 +976,51 @@ def main() -> None:
     media_3m = mensal.tail(3)["faturamento"].mean() if not mensal.empty else 0
     gap_meta = mensal_last - meta_mensal
 
+    if modo_apresentacao:
+        render_presentation_mode(
+            df_f=df_f,
+            mensal=mensal,
+            alerts=alerts,
+            forecast_df=forecast_df,
+            meta_mensal=meta_mensal,
+            receita_total=receita_total,
+            quantidade_total=quantidade_total,
+            pedidos_unicos=pedidos_unicos,
+            ticket_medio_pedido=ticket_medio_pedido,
+            top_cliente_name=top_cliente_name,
+            top_cliente_share=top_cliente_share,
+            top_prod_name=top_prod_name,
+            mensal_last=mensal_last,
+            media_3m=media_3m,
+            gap_meta=gap_meta,
+        )
+
+        missing_nota = df["nota"].isna().mean() * 100
+        missing_cfop = df["cfop"].isna().mean() * 100
+        st.markdown(
+            f'<div class="foot-note">Qualidade de dados: Nota com {missing_nota:.1f}% de ausência e CFOP com {missing_cfop:.1f}% de ausência.</div>',
+            unsafe_allow_html=True,
+        )
+        return
+
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    with c1:
+        st.markdown(kpi_card("Faturamento", to_brl(receita_total), "Receita no período", delta_receita), unsafe_allow_html=True)
+    with c2:
+        st.markdown(kpi_card("Volume", to_int(quantidade_total), "Unidades faturadas", delta_volume), unsafe_allow_html=True)
+    with c3:
+        st.markdown(kpi_card("Pedidos", to_int(pedidos_unicos), "Pedidos únicos"), unsafe_allow_html=True)
+    with c4:
+        st.markdown(kpi_card("Ticket por Pedido", to_brl(ticket_medio_pedido), "Média por pedido"), unsafe_allow_html=True)
+    with c5:
+        st.markdown(kpi_card("Preço Médio", to_brl(preco_medio_ponderado), "Valor por unidade"), unsafe_allow_html=True)
+    with c6:
+        st.markdown(kpi_card("Clientes Ativos", to_int(clientes_ativos), f"{to_int(produtos_ativos)} produtos ativos"), unsafe_allow_html=True)
+
+    insights = generate_insights(df_f)
+    st.markdown('<div class="insight-box">' + "".join([f"<p>• {i}</p>" for i in insights]) + "</div>", unsafe_allow_html=True)
+
+    st.subheader("Narrativa Executiva em 60 Segundos")
     st.markdown(
         (
             '<div class="story-row">'

@@ -6,6 +6,7 @@ Dashboard visual e dinâmico para análise de produtos faturados, conectado em t
 
 - KPIs executivos: faturamento, volume, pedidos, ticket médio e preço médio ponderado.
 - Narrativa executiva de 60 segundos para abrir apresentação com contexto e foco.
+- Modo Apresentação com roteiro guiado em 4 etapas: Panorama, Riscos, Oportunidades e Plano.
 - Alertas inteligentes com semáforo de risco (concentração, queda de receita e dispersão de preço).
 - Metas configuráveis no painel lateral (meta mensal e limites de concentração).
 - Aba de previsão para os próximos 4 meses com faixa provável e cenários conservador/base/otimista.

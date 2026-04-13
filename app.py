@@ -136,6 +136,19 @@ def inject_styles() -> None:
                 border-bottom: 2px solid #0c6e74;
             }
 
+            /* Multiselect badges/tags */
+            [data-baseweb="tag"] {
+                background-color: #0c6e74 !important;
+            }
+
+            [data-baseweb="tag"] > span {
+                color: #ffffff !important;
+            }
+
+            [data-baseweb="tag"] [data-testid="stTagCloseButton"] {
+                color: rgba(255, 255, 255, 0.7) !important;
+            }
+
             [data-baseweb="tab-panel"] {
                 background: rgba(255, 255, 255, 0.52);
                 border: 1px solid rgba(17, 32, 63, 0.08);

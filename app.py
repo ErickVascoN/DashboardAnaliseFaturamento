@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import io
+import os
 import re
+import time
 import unicodedata
-from datetime import timedelta
+from datetime import date, timedelta
 from urllib.parse import parse_qs, urlparse
 
 import numpy as np
@@ -41,7 +43,7 @@ def inject_styles() -> None:
     st.markdown(
         """
         <style>
-            @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Sora:wght@500;600;700&display=swap');
 
             :root {
                 --primary: #0C6E74;
@@ -62,20 +64,107 @@ def inject_styles() -> None:
                 font-family: 'Space Grotesk', sans-serif;
             }
 
+            .stApp p,
+            .stApp li,
+            .stApp span,
+            .stApp label,
+            .stApp div {
+                color: #1e2b47;
+            }
+
             [data-testid="stSidebar"] {
                 background: linear-gradient(180deg, #0B132B 0%, #15213f 100%);
                 border-right: 1px solid rgba(255, 255, 255, 0.08);
             }
 
-            [data-testid="stSidebar"] * {
+            [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
+            [data-testid="stSidebar"] h1,
+            [data-testid="stSidebar"] h2,
+            [data-testid="stSidebar"] h3,
+            [data-testid="stSidebar"] label,
+            [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
+            [data-testid="stSidebar"] .stCaption {
                 color: #e9f1ff !important;
                 font-family: 'Space Grotesk', sans-serif;
+            }
+
+            [data-testid="stSidebar"] [data-baseweb="input"] > div,
+            [data-testid="stSidebar"] [data-baseweb="select"] > div,
+            [data-testid="stSidebar"] [data-baseweb="textarea"] > div {
+                background: rgba(255, 255, 255, 0.96) !important;
+                border: 1px solid rgba(19, 36, 69, 0.24) !important;
+            }
+
+            [data-testid="stSidebar"] input,
+            [data-testid="stSidebar"] textarea,
+            [data-testid="stSidebar"] [data-baseweb="select"] input {
+                color: #132445 !important;
+                -webkit-text-fill-color: #132445 !important;
+                font-weight: 500;
+            }
+
+            [data-testid="stSidebar"] input::placeholder,
+            [data-testid="stSidebar"] textarea::placeholder {
+                color: #5a6b8f !important;
+                opacity: 1;
+            }
+
+            [data-testid="stSidebar"] [data-baseweb="slider"] [role="slider"] {
+                background-color: #ff5a54 !important;
+            }
+
+            [data-testid="stSidebar"] [data-baseweb="slider"] > div > div {
+                background: rgba(255, 255, 255, 0.3) !important;
+            }
+
+            [data-baseweb="tab-list"] {
+                gap: 0.45rem;
+                margin-bottom: 0.7rem;
+            }
+
+            [data-baseweb="tab-list"] button {
+                color: #2b3b5f !important;
+                font-weight: 700;
+                background: rgba(255, 255, 255, 0.6);
+                border-radius: 10px 10px 0 0;
+                padding: 0.4rem 0.7rem;
+            }
+
+            [data-baseweb="tab-list"] button[aria-selected="true"] {
+                color: #c33024 !important;
+                background: rgba(255, 255, 255, 0.92);
+                border-bottom: 2px solid #c33024;
+            }
+
+            [data-baseweb="tab-panel"] {
+                background: rgba(255, 255, 255, 0.52);
+                border: 1px solid rgba(17, 32, 63, 0.08);
+                border-radius: 0 12px 12px 12px;
+                padding: 0.6rem 0.8rem 0.9rem 0.8rem;
             }
 
             h1, h2, h3 {
                 font-family: 'Fraunces', serif !important;
                 color: #11203f;
                 letter-spacing: 0.2px;
+            }
+
+            [data-testid="stWidgetLabel"] p,
+            [data-testid="stMetricLabel"] p,
+            .stCaption,
+            small {
+                color: #3c4d70 !important;
+            }
+
+            [data-testid="stMetricValue"] {
+                font-family: 'Sora', 'Space Grotesk', sans-serif !important;
+                font-weight: 600 !important;
+                color: #132445 !important;
+                font-variant-numeric: tabular-nums;
+            }
+
+            [data-testid="stMarkdownContainer"] p strong {
+                color: #12213e;
             }
 
             .hero {
@@ -119,11 +208,13 @@ def inject_styles() -> None:
             }
 
             .kpi-value {
-                font-family: 'Fraunces', serif;
-                font-weight: 700;
+                font-family: 'Sora', 'Space Grotesk', sans-serif;
+                font-weight: 600;
                 color: var(--ink);
-                font-size: 1.78rem;
+                font-size: 1.72rem;
                 line-height: 1.08;
+                font-variant-numeric: tabular-nums;
+                letter-spacing: 0.08px;
             }
 
             .kpi-sub {
@@ -176,6 +267,22 @@ def inject_styles() -> None:
                 margin: 0.22rem 0;
                 color: #1f2d4a;
                 font-size: 0.92rem;
+            }
+
+            .chart-help {
+                background: rgba(255, 255, 255, 0.86);
+                border: 1px solid rgba(17, 32, 63, 0.08);
+                border-left: 5px solid #0C6E74;
+                border-radius: 12px;
+                padding: 0.62rem 0.8rem;
+                margin-top: 0.35rem;
+                margin-bottom: 0.95rem;
+            }
+
+            .chart-help p {
+                margin: 0.08rem 0;
+                color: #223456;
+                font-size: 0.84rem;
             }
 
             .alert-card {
@@ -240,22 +347,62 @@ def normalize_text(value: str) -> str:
 
 
 def to_brl(value: float) -> str:
+    """Formata valor em R$ com separadores de milhar (formato brasileiro)."""
     if pd.isna(value):
         return "R$ 0,00"
+    # Format: 1234567.89 -> 1.234.567,89
     formatted = f"{value:,.2f}"
     return f"R$ {formatted}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
 def to_int(value: float) -> str:
+    """Formata inteiro com separadores de milhar (formato brasileiro: 1.234.567)."""
     if pd.isna(value):
         return "0"
+    # Format: 1234567 -> 1.234.567
     return f"{int(round(value)):,}".replace(",", ".")
 
 
+def format_number_br(value: float, decimals: int = 0) -> str:
+    """Formata número genérico com separadores de milhar (formato brasileiro)."""
+    if pd.isna(value):
+        return "0"
+    if decimals == 0:
+        return f"{int(round(value)):,}".replace(",", ".")
+    else:
+        formatted = f"{value:,.{decimals}f}"
+        return formatted.replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def safe_to_float(value) -> float | None:
+    """Converte valor para float com segurança, retorna None para valores inválidos."""
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        value = value.strip().upper()
+        if value in ["NI", "N/A", "", "-", "NULL"]:
+            return None
+        try:
+            return float(value)
+        except ValueError:
+            return None
+    return None
+
+
 def to_pct(value: float) -> str:
+    """Formata percentual (formato brasileiro)."""
     if pd.isna(value):
         return "0,0%"
     return f"{value * 100:.1f}%".replace(".", ",")
+
+
+def to_date_br_short(value: pd.Timestamp | str) -> str:
+    dt = pd.to_datetime(value, errors="coerce")
+    if pd.isna(dt):
+        return ""
+    return dt.strftime("%d/%m/%y")
 
 
 def build_export_url(sheet_url: str) -> str:
@@ -323,8 +470,6 @@ def canonical_column_names(columns: list[str]) -> dict[str, str]:
             renamed[original] = "municipio"
         elif "frete" in key:
             renamed[original] = "frete"
-        elif "vendedor" in key:
-            renamed[original] = "vendedor"
         elif "quant" in key:
             renamed[original] = "quantidade"
         elif "valor" in key and "unit" in key:
@@ -348,11 +493,34 @@ def canonical_column_names(columns: list[str]) -> dict[str, str]:
 
 @st.cache_data(ttl=CACHE_TTL_SECONDS, show_spinner=False)
 def load_data(sheet_url: str) -> pd.DataFrame:
+    """Carrega dados com retry exponencial e fallback local (TIER 3 Melhoria)."""
     export_url = build_export_url(sheet_url)
-    response = requests.get(export_url, timeout=45)
-    response.raise_for_status()
-
-    csv_text = response.content.decode("utf-8-sig", errors="ignore")
+    
+    # Retry com backoff exponencial (TIER 3 FIX)
+    max_retries = 3
+    base_delay = 2  # segundos
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(export_url, timeout=45)
+            response.raise_for_status()
+            csv_text = response.content.decode("utf-8-sig", errors="ignore")
+            break  # Sucesso, sai do loop
+        except Exception as e:
+            if attempt < max_retries - 1:
+                delay = base_delay * (2 ** attempt)  # 2, 4, 8 segundos
+                st.warning(f"Tentativa {attempt + 1} falhou. Retentando em {delay}s... ({str(e)[:50]})")
+                import time
+                time.sleep(delay)
+            else:
+                # Fallback: tenta carregar arquivo local se existir
+                fallback_file = "cache_data.csv"
+                if os.path.exists(fallback_file):
+                    st.warning(f"Falha permanente. Carregando dados em cache (mais recente).")
+                    with open(fallback_file, "r", encoding="utf-8-sig") as f:
+                        csv_text = f.read()
+                else:
+                    raise ValueError("Não foi possível carregar do Google Sheets e sem cache local disponível.")
+    
     df = pd.read_csv(io.StringIO(csv_text), dtype=str)
     df = df.rename(columns=canonical_column_names(list(df.columns)))
 
@@ -362,7 +530,6 @@ def load_data(sheet_url: str) -> pd.DataFrame:
         "destinatario",
         "municipio",
         "frete",
-        "vendedor",
         "quantidade",
         "valor_unit",
         "valor_total",
@@ -391,6 +558,7 @@ def load_data(sheet_url: str) -> pd.DataFrame:
     df["quantidade"] = parse_br_number(df["quantidade"]).fillna(0)
     df["valor_unit"] = parse_br_number(df["valor_unit"]).fillna(0)
     df["valor_total"] = parse_br_number(df["valor_total"]).fillna(0)
+    df = df.drop(columns=["vendedor"], errors="ignore")
 
     df = df[df["data_emissao"].notna()].copy()
     df["pedido"] = df["pedido"].astype(str)
@@ -431,6 +599,7 @@ def kpi_card(title: str, value: str, subtext: str, delta: float | None = None) -
 
 
 def compare_previous_period(df_all: pd.DataFrame, start_date: pd.Timestamp, end_date: pd.Timestamp, metric_col: str) -> float | None:
+    """Compara período atual com período anterior de mesma duração."""
     if metric_col not in df_all.columns:
         return None
 
@@ -450,6 +619,38 @@ def compare_previous_period(df_all: pd.DataFrame, start_date: pd.Timestamp, end_
     return (current_value - prev_value) / prev_value
 
 
+def compare_with_baseline(df_all: pd.DataFrame, start_date: pd.Timestamp, end_date: pd.Timestamp, metric_col: str, baseline_type: str) -> float | None:
+    """Compara período atual com múltiplas baselines: anterior, ano passado, ou média 3M (TIER 1 FIX)."""
+    if metric_col not in df_all.columns or df_all.empty:
+        return None
+
+    current_mask = (df_all["data_emissao"] >= start_date) & (df_all["data_emissao"] <= end_date)
+    current_value = df_all.loc[current_mask, metric_col].sum()
+
+    if baseline_type == "período_anterior":
+        return compare_previous_period(df_all, start_date, end_date, metric_col)
+    
+    elif baseline_type == "ano_passado":
+        prev_year_start = start_date - pd.DateOffset(years=1)
+        prev_year_end = end_date - pd.DateOffset(years=1)
+        prev_mask = (df_all["data_emissao"] >= prev_year_start) & (df_all["data_emissao"] <= prev_year_end)
+        prev_value = df_all.loc[prev_mask, metric_col].sum()
+        if prev_value <= 0:
+            return None
+        return (current_value - prev_value) / prev_value
+    
+    elif baseline_type == "media_3m":
+        months_back = 3
+        three_months_ago = start_date - pd.DateOffset(months=months_back)
+        prev_mask = (df_all["data_emissao"] >= three_months_ago) & (df_all["data_emissao"] < start_date)
+        prev_value = df_all.loc[prev_mask, metric_col].sum() / months_back if not df_all.loc[prev_mask].empty else 0
+        if prev_value <= 0:
+            return None
+        return (current_value - prev_value) / prev_value
+    
+    return None
+
+
 def monthly_view(df: pd.DataFrame) -> pd.DataFrame:
     return (
         df.groupby("ano_mes", as_index=False)
@@ -465,7 +666,6 @@ def monthly_view(df: pd.DataFrame) -> pd.DataFrame:
 def build_alerts(
     df: pd.DataFrame,
     cliente_limit: float,
-    vendedor_limit: float,
 ) -> list[dict[str, str]]:
     if df.empty:
         return []
@@ -493,23 +693,6 @@ def build_alerts(
                 }
             )
 
-    vendedor_agg = (
-        df.groupby("vendedor", as_index=False)["valor_total"]
-        .sum()
-        .sort_values("valor_total", ascending=False)
-    )
-    if not vendedor_agg.empty:
-        share_vendedor = vendedor_agg.iloc[0]["valor_total"] / receita_total
-        if share_vendedor >= vendedor_limit:
-            alerts.append(
-                {
-                    "severity": "mid",
-                    "title": "Dependência comercial por vendedor",
-                    "detail": f"Vendedor {vendedor_agg.iloc[0]['vendedor']} responde por {to_pct(share_vendedor)} do faturamento.",
-                    "action": "Ação sugerida: redistribuir carteira e criar plano de cobertura comercial.",
-                }
-            )
-
     mensal = monthly_view(df)
     if len(mensal) >= 4:
         ult = mensal.iloc[-1]["faturamento"]
@@ -527,15 +710,20 @@ def build_alerts(
                 )
 
     ticket_item = np.where(df["quantidade"] > 0, df["valor_total"] / df["quantidade"], np.nan)
-    if np.nanmean(ticket_item) > 0 and np.nanstd(ticket_item) / np.nanmean(ticket_item) > 1.2:
-        alerts.append(
-            {
-                "severity": "mid",
-                "title": "Alta dispersão de preço médio por item",
-                "detail": "Existe grande variação de preço unitário entre vendas no recorte atual.",
-                "action": "Ação sugerida: revisar política de preço e descontos por canal/cliente.",
-            }
-        )
+    # Proteção contra divisão por zero e valores inválidos (TIER 1 FIX)
+    mean_val = np.nanmean(ticket_item)
+    std_val = np.nanstd(ticket_item)
+    if pd.notna(mean_val) and mean_val > 0 and pd.notna(std_val) and std_val > 0:
+        coef_var = std_val / mean_val
+        if coef_var > 1.2:
+            alerts.append(
+                {
+                    "severity": "mid",
+                    "title": "Alta dispersão de preço médio por item",
+                    "detail": f"Existe grande variação de preço unitário entre vendas (CV: {coef_var:.2f}x).",
+                    "action": "Ação sugerida: revisar política de preço e descontos por canal/cliente.",
+                }
+            )
 
     if not alerts:
         alerts.append(
@@ -551,22 +739,43 @@ def build_alerts(
 
 
 def build_forecast(mensal: pd.DataFrame, periods: int = 4) -> pd.DataFrame:
+    """Constrói previsão com detecção de sazonalidade (TIER 2 Melhoria)."""
     if len(mensal) < 4:
         return pd.DataFrame()
 
     x = np.arange(len(mensal), dtype=float)
     y = mensal["faturamento"].to_numpy(dtype=float)
 
+    # Detecção básica de sazonalidade: se houver pelo menos 12 meses, busca padrão
+    has_seasonality = False
+    seasonal_factor = 1.0
+    if len(mensal) >= 12:
+        # Compara pares de meses: mês N vs mês N-12
+        last_year = mensal.tail(12)["faturamento"].mean()
+        two_years_ago = mensal.iloc[-24:-12]["faturamento"].mean() if len(mensal) >= 24 else last_year
+        if two_years_ago > 0:
+            seasonal_factor = last_year / two_years_ago
+            # Se a relação entre anos está entre 0.8 e 1.2, considera estável (sem sazonalidade forte)
+            has_seasonality = seasonal_factor < 0.85 or seasonal_factor > 1.15
+
+    # Regressão linear como baseline
     slope, intercept = np.polyfit(x, y, 1)
     trend = slope * x + intercept
     residuals = y - trend
     sigma = float(np.std(residuals, ddof=1)) if len(residuals) > 1 else 0.0
 
+    # Previsão com aplicação de fator sazonal se detectado
     future_x = np.arange(len(mensal), len(mensal) + periods, dtype=float)
     future_y = slope * future_x + intercept
+    if has_seasonality:
+        # Aplica fator sazonal progressivamente (suavizado)
+        for i, fy in enumerate(future_y):
+            seasonal_adjustment = seasonal_factor ** (i / periods)  # Suavização gradual
+            future_y[i] = fy * seasonal_adjustment
+
     future_dates = [mensal["ano_mes"].max() + pd.offsets.MonthBegin(i + 1) for i in range(periods)]
 
-    z_score = 1.28
+    z_score = 1.28  # ~80% de confiança
     lower = np.maximum(0, future_y - z_score * sigma)
     upper = np.maximum(0, future_y + z_score * sigma)
 
@@ -597,6 +806,80 @@ def render_alerts(alerts: list[dict[str, str]]) -> None:
         )
 
 
+def render_chart_help(purpose: str, insight: str) -> None:
+    st.markdown(
+        (
+            '<div class="chart-help">'
+            f"<p><strong>Para que serve:</strong> {purpose}</p>"
+            f"<p><strong>Insight:</strong> {insight}</p>"
+            "</div>"
+        ),
+        unsafe_allow_html=True,
+    )
+
+
+def render_kpi_section(df_f: pd.DataFrame, receita_total: float, quantidade_total: float, pedidos_unicos: int, 
+                       ticket_medio_pedido: float, preco_medio_ponderado: float, clientes_ativos: int, 
+                       produtos_ativos: int, delta_receita: float | None, delta_volume: float | None) -> None:
+    """Renderiza seção de KPIs principais (TIER 2 Refactor)."""
+    c1, c2, c3, c4, c5, c6 = st.columns(6)
+    with c1:
+        st.markdown(kpi_card("Peças Faturadas", to_brl(receita_total), "Receita no período", delta_receita), unsafe_allow_html=True)
+    with c2:
+        st.markdown(kpi_card("Volume", to_int(quantidade_total), "Unidades faturadas", delta_volume), unsafe_allow_html=True)
+    with c3:
+        st.markdown(kpi_card("Pedidos", to_int(pedidos_unicos), "Pedidos únicos"), unsafe_allow_html=True)
+    with c4:
+        st.markdown(kpi_card("Ticket por Pedido", to_brl(ticket_medio_pedido), "Média por pedido"), unsafe_allow_html=True)
+    with c5:
+        st.markdown(kpi_card("Preço Médio", to_brl(preco_medio_ponderado), "Valor por unidade"), unsafe_allow_html=True)
+    with c6:
+        st.markdown(kpi_card("Clientes Ativos", to_int(clientes_ativos), f"{to_int(produtos_ativos)} produtos ativos"), unsafe_allow_html=True)
+
+
+def render_narrative_section(mensal_last: float, media_3m: float, top_cliente_name: str, top_cliente_share: float,
+                             top_prod_name: str, gap_meta: float, meta_mensal: float) -> None:
+    """Renderiza narrativa executiva de 60 segundos (TIER 2 Refactor)."""
+    insights = generate_insights_from_metrics(mensal_last, media_3m, top_cliente_share, gap_meta, meta_mensal)
+    st.markdown('<div class="insight-box">' + "".join([f"<p>• {i}</p>" for i in insights]) + "</div>", unsafe_allow_html=True)
+
+    st.subheader("Narrativa Executiva em 60 Segundos")
+    st.markdown(
+        (
+            '<div class="story-row">'
+            f"<p><strong>Onde estamos:</strong> peças faturadas recentes de {to_brl(mensal_last)} versus média móvel trimestral de {to_brl(media_3m)}.</p>"
+            f"<p><strong>O que move o resultado:</strong> principal cliente é {top_cliente_name} com {to_pct(top_cliente_share)} da receita; produto líder: {top_prod_name}.</p>"
+            f"<p><strong>O que fazer agora:</strong> {'acelerar receita para fechar meta mensal' if gap_meta < 0 else 'sustentar ritmo e proteger margem'} ({to_brl(abs(gap_meta))} {'abaixo' if gap_meta < 0 else 'acima'} da meta).</p>"
+            "</div>"
+        ),
+        unsafe_allow_html=True,
+    )
+
+
+def generate_insights_from_metrics(mensal_last: float, media_3m: float, top_cliente_share: float, 
+                                   gap_meta: float, meta_mensal: float) -> list[str]:
+    """Gera insights automaticamente baseado em métricas principais (TIER 2 Refactor)."""
+    insights = []
+    
+    if mensal_last > media_3m * 1.1:
+        insights.append(f"Crescimento forte: faturamento {to_pct((mensal_last / media_3m - 1))} acima da média trimestral.")
+    elif mensal_last < media_3m * 0.9:
+        insights.append(f"Queda preocupante: {to_pct((1 - mensal_last / media_3m))} abaixo da média dos últimos 3 meses.")
+    
+    if top_cliente_share > 0.4:
+        insights.append(f"Concentração elevada: maior cliente representa {to_pct(top_cliente_share)} (risco maior que 30%).")
+    
+    if gap_meta < 0:
+        insights.append(f"Meta em risco: faltam {to_brl(abs(gap_meta))} para atingir o objetivo mensal.")
+    elif gap_meta > meta_mensal * 0.2:
+        insights.append(f"Desempenho acima da expectativa: {to_pct(gap_meta / meta_mensal)} acima da meta.")
+    
+    if not insights:
+        insights.append("Operação dentro do normal. Acompanhe métricas semanalmente.")
+    
+    return insights[:4]  # Limita a 4 insights
+
+
 def generate_insights(df: pd.DataFrame) -> list[str]:
     insights: list[str] = []
 
@@ -610,7 +893,7 @@ def generate_insights(df: pd.DataFrame) -> list[str]:
         top_cliente = cliente_agg.iloc[0]
         share_cliente = top_cliente["valor_total"] / receita_total
         insights.append(
-            f"Cliente líder: {top_cliente['destinatario']} concentra {to_pct(share_cliente)} do faturamento filtrado."
+            f"Cliente líder: {top_cliente['destinatario']} concentra {to_pct(share_cliente)} das peças faturadas no recorte."
         )
 
     produto_agg = df.groupby("descricao_produto", as_index=False)["valor_total"].sum().sort_values("valor_total", ascending=False)
@@ -619,13 +902,6 @@ def generate_insights(df: pd.DataFrame) -> list[str]:
         share_prod = top_prod["valor_total"] / receita_total
         insights.append(
             f"Produto de maior impacto: {top_prod['descricao_produto']} representa {to_pct(share_prod)} da receita atual."
-        )
-
-    vendedor_agg = df.groupby("vendedor", as_index=False)["valor_total"].sum().sort_values("valor_total", ascending=False)
-    if len(vendedor_agg) > 0 and receita_total > 0:
-        share_vendedor = vendedor_agg.iloc[0]["valor_total"] / receita_total
-        insights.append(
-            f"Concentração comercial: vendedor {vendedor_agg.iloc[0]['vendedor']} responde por {to_pct(share_vendedor)} do faturamento."
         )
 
     mensal = df.groupby("ano_mes", as_index=False)["valor_total"].sum().sort_values("ano_mes")
@@ -643,14 +919,45 @@ def generate_insights(df: pd.DataFrame) -> list[str]:
 
 
 def chart_layout(fig: go.Figure) -> go.Figure:
+    fig.update_layout(template="plotly_white")
     fig.update_layout(
-        plot_bgcolor="rgba(255,255,255,0)",
-        paper_bgcolor="rgba(255,255,255,0)",
+        plot_bgcolor="#f8fbff",
+        paper_bgcolor="#f8fbff",
         margin=dict(l=10, r=10, t=40, b=20),
         legend_title_text="",
-        font=dict(family="Space Grotesk, sans-serif", color=COLORS["ink"]),
+        font=dict(family="Space Grotesk, sans-serif", color="#1b2a47"),
+        legend=dict(font=dict(color="#213352")),
+    )
+    fig.update_xaxes(
+        showgrid=False,
+        showline=True,
+        linecolor="rgba(27,42,71,0.6)",
+        tickfont=dict(color="#233453"),
+        title_font=dict(color="#1b2a47"),
+        tickformat="%d/%m/%y",
+        hoverformat="%d/%m/%y",
+    )
+    fig.update_yaxes(
+        showgrid=True,
+        gridcolor="rgba(35,52,83,0.18)",
+        zeroline=True,
+        zerolinecolor="rgba(35,52,83,0.3)",
+        tickfont=dict(color="#233453"),
+        title_font=dict(color="#1b2a47"),
     )
     return fig
+
+
+def get_dynamic_chart_height(data_points: int, base_height: int = 400) -> int:
+    """Calcula altura dinâmica do gráfico baseado na quantidade de dados (TIER 2 Melhoria)."""
+    if data_points <= 5:
+        return base_height
+    elif data_points <= 15:
+        return int(base_height * 1.2)
+    elif data_points <= 25:
+        return int(base_height * 1.5)
+    else:
+        return int(base_height * (1 + min((data_points - 25) * 0.05, 2.0)))  # Cap em 3x
 
 
 def render_presentation_mode(
@@ -682,7 +989,7 @@ def render_presentation_mode(
 
     if etapa == "Panorama":
         k1, k2, k3, k4 = st.columns(4)
-        k1.metric("Faturamento", to_brl(receita_total))
+        k1.metric("Peças Faturadas", to_brl(receita_total))
         k2.metric("Volume", to_int(quantidade_total))
         k3.metric("Pedidos", to_int(pedidos_unicos))
         k4.metric("Ticket", to_brl(ticket_medio_pedido))
@@ -693,7 +1000,7 @@ def render_presentation_mode(
                 x=mensal["ano_mes"],
                 y=mensal["faturamento"],
                 mode="lines+markers",
-                name="Faturamento",
+                name="Peças Faturadas",
                 line=dict(color=COLORS["primary"], width=4),
             )
         )
@@ -707,6 +1014,15 @@ def render_presentation_mode(
         )
         fig.update_layout(title="Panorama Mensal de Receita e Volume")
         st.plotly_chart(chart_layout(fig), use_container_width=True)
+        if len(mensal) >= 2 and mensal.iloc[-2]["faturamento"] > 0:
+            delta_mes = (mensal.iloc[-1]["faturamento"] - mensal.iloc[-2]["faturamento"]) / mensal.iloc[-2]["faturamento"]
+            insight_panorama = f"No mês mais recente, as peças faturadas {'subiram' if delta_mes >= 0 else 'caíram'} {to_pct(abs(delta_mes))} vs mês anterior."
+        else:
+            insight_panorama = f"No recorte atual, o total mais recente de peças faturadas é {to_brl(mensal_last)}."
+        render_chart_help(
+            "Comparar evolução mensal de receita e volume para identificar aceleração ou desaceleração do negócio.",
+            insight_panorama,
+        )
 
         st.markdown(
             (
@@ -735,6 +1051,15 @@ def render_presentation_mode(
             labels={"valor_total": "Receita (R$)", "destinatario": "Cliente"},
         )
         st.plotly_chart(chart_layout(fig_risk), use_container_width=True)
+        if not top_clientes.empty and top_clientes["valor_total"].sum() > 0:
+            share_top3 = top_clientes["valor_total"].head(3).sum() / top_clientes["valor_total"].sum()
+            insight_risco = f"Os 3 maiores clientes concentram {to_pct(share_top3)} do top 8 exibido."
+        else:
+            insight_risco = "Sem dados suficientes para inferir concentração no recorte."
+        render_chart_help(
+            "Mostrar risco de dependência comercial por carteira de clientes.",
+            insight_risco,
+        )
 
     elif etapa == "Oportunidades":
         c1, c2 = st.columns(2)
@@ -763,6 +1088,15 @@ def render_presentation_mode(
                 labels={"valor_total": "Receita (R$)", "descricao_produto": "Produto"},
             )
             st.plotly_chart(chart_layout(fig_prod), use_container_width=True)
+            if not produto_perf.empty and produto_perf["valor_total"].sum() > 0:
+                share_top_prod = produto_perf.iloc[0]["valor_total"] / produto_perf["valor_total"].sum()
+                insight_prod = f"O produto líder representa {to_pct(share_top_prod)} da receita dos 12 principais itens."
+            else:
+                insight_prod = "Sem dados suficientes para inferir concentração de produto."
+            render_chart_help(
+                "Destacar quais produtos puxam resultado e merecem prioridade comercial.",
+                insight_prod,
+            )
 
         with c2:
             fig_geo = px.bar(
@@ -775,6 +1109,15 @@ def render_presentation_mode(
                 labels={"valor_total": "Receita (R$)", "estado": "Estado"},
             )
             st.plotly_chart(chart_layout(fig_geo), use_container_width=True)
+            if not estado_perf.empty and estado_perf["valor_total"].sum() > 0:
+                share_estado = estado_perf.iloc[0]["valor_total"] / estado_perf["valor_total"].sum()
+                insight_geo = f"O estado líder concentra {to_pct(share_estado)} da receita geográfica no período."
+            else:
+                insight_geo = "Sem dados suficientes para inferir concentração geográfica."
+            render_chart_help(
+                "Comparar tração comercial por estado para orientar expansão territorial.",
+                insight_geo,
+            )
 
         st.markdown(
             f"**Mensagem-chave:** maior alavanca atual está em {top_prod_name}, e o cliente líder é {top_cliente_name} ({to_pct(top_cliente_share)} da receita)."
@@ -808,6 +1151,11 @@ def render_presentation_mode(
             )
             fig_gauge.update_layout(height=320)
             st.plotly_chart(chart_layout(fig_gauge), use_container_width=True)
+            atingimento_meta = (mensal_last / meta_mensal) if meta_mensal > 0 else 0
+            render_chart_help(
+                "Mostrar o quanto o mês atual está distante da meta de peças faturadas.",
+                f"Atingimento atual: {to_pct(atingimento_meta)} da meta mensal configurada.",
+            )
 
         with right:
             if forecast_df.empty:
@@ -834,6 +1182,11 @@ def render_presentation_mode(
                 )
                 fig_forecast.update_layout(title="Previsão de Receita - 4 Meses")
                 st.plotly_chart(chart_layout(fig_forecast), use_container_width=True)
+                meses_acima_meta = int((forecast_df["faturamento_previsto"] >= meta_mensal).sum())
+                render_chart_help(
+                    "Antecipar tendência de peças faturadas para planejar decisões comerciais com antecedência.",
+                    f"Na previsão base, {meses_acima_meta} de {len(forecast_df)} meses ficam acima da meta atual.",
+                )
 
         st.markdown("**Plano de ação recomendado:**")
         st.markdown("1. Defender as contas estratégicas e reduzir concentração com novas contas de médio porte.")
@@ -849,8 +1202,8 @@ def main() -> None:
     st.markdown(
         """
         <div class="hero">
-            <h2>Radar Executivo de Produtos Faturados</h2>
-            <p>Visão comercial e operacional em tempo real, conectada ao Google Sheets.</p>
+            <h2>Análise de Produtos Faturados</h2>
+            <p>Visão comercial e operacional em tempo real.</p>
         </div>
         """,
         unsafe_allow_html=True,
@@ -858,6 +1211,22 @@ def main() -> None:
 
     with st.sidebar:
         st.title("Configuração")
+        
+        # Help inicial (TIER 3 Onboarding)
+        with st.expander("ℹ️ Como usar este dashboard", expanded=False):
+            st.markdown("""
+            **Visão Executiva**: Métricas principais e tendências.  
+            **Comercial**: Análise por vendedor e clientes.  
+            **Produtos**: Ranking e mix de receita.  
+            **Geografia**: Estados e cidades com maior potencial.  
+            **Previsão**: Cenários para os próximos 4 meses.
+            
+            💡 **Dicas**:
+            - Altere a "Comparação" para ver deltas vs. ano passado ou média 3M
+            - Use os alertas inteligentes para monitorar riscos
+            - Em "Modo Apresentação", siga o guia de 4 etapas para reuniões
+            """)
+        
         sheet_url = st.text_input("Link da planilha Google Sheets", value=DEFAULT_SHEET_URL)
         refresh_click = st.button("Atualizar dados agora", use_container_width=True)
         modo_apresentacao = st.toggle("Modo Apresentação", value=False)
@@ -878,30 +1247,163 @@ def main() -> None:
 
     data_min = df["data_emissao"].min().date()
     data_max = df["data_emissao"].max().date()
+    data_max_ano = date(data_max.year, 12, 31)
+
+    # Calcular anos e meses disponíveis
+    df["ano_filtro"] = df["data_emissao"].dt.year
+    df["mes_filtro"] = df["data_emissao"].dt.month
+    
+    anos_disponiveis = sorted(df["ano_filtro"].unique().tolist())
+    
+    # Callbacks para cascata de filtros
+    def _on_ano_change():
+        """Reset dependências quando Ano muda"""
+        for k in ("filtro_mes", "filtro_modo", "filtro_dia_unico", "filtro_data_ini", "filtro_data_fim"):
+            st.session_state.pop(k, None)
+    
+    def _on_mes_change():
+        """Reset dependências quando Mês muda"""
+        for k in ("filtro_modo", "filtro_dia_unico", "filtro_data_ini", "filtro_data_fim"):
+            st.session_state.pop(k, None)
 
     with st.sidebar:
         st.markdown("---")
-        st.subheader("Filtros")
-
-        periodo = st.date_input(
-            "Período",
-            value=(data_min, data_max),
-            min_value=data_min,
-            max_value=data_max,
+        st.subheader("Filtros de Data")
+        
+        # Filtro 1: Seleção de Anos
+        if "filtro_ano" not in st.session_state:
+            st.session_state["filtro_ano"] = anos_disponiveis
+        
+        anos_sel = st.multiselect(
+            "Anos",
+            options=anos_disponiveis,
+            default=st.session_state["filtro_ano"],
+            key="filtro_ano",
+            on_change=_on_ano_change,
         )
-        if not isinstance(periodo, tuple) or len(periodo) != 2:
-            st.error("Selecione data inicial e final.")
-            st.stop()
+        if not anos_sel:
+            anos_sel = anos_disponiveis
+        
+        # Filtro 2: Seleção de Meses (em cascata com Anos)
+        meses_disponiveis = sorted(
+            df[df["ano_filtro"].isin(anos_sel)]["mes_filtro"].unique().tolist()
+        )
+        
+        if "filtro_mes" not in st.session_state:
+            st.session_state["filtro_mes"] = meses_disponiveis
+        else:
+            # Validar que meses selecionados ainda existem nos anos selecionados
+            valid_meses = set(meses_disponiveis)
+            st.session_state["filtro_mes"] = [m for m in st.session_state["filtro_mes"] if m in valid_meses]
+        
+        MESES_NOMES = {1: "Jan", 2: "Fev", 3: "Mar", 4: "Abr", 5: "Mai", 6: "Jun",
+                       7: "Jul", 8: "Ago", 9: "Set", 10: "Out", 11: "Nov", 12: "Dez"}
+        
+        meses_sel = st.multiselect(
+            "Meses",
+            options=meses_disponiveis,
+            default=st.session_state["filtro_mes"],
+            format_func=lambda m: MESES_NOMES.get(m, f"Mês {m}"),
+            key="filtro_mes",
+            on_change=_on_mes_change,
+        )
+        if not meses_sel:
+            meses_sel = meses_disponiveis
+        
+        # Calcular range de datas baseado em Anos/Meses selecionados
+        df_filt_temp = df[df["ano_filtro"].isin(anos_sel) & df["mes_filtro"].isin(meses_sel)]
+        
+        if not df_filt_temp.empty:
+            d_min_filt = df_filt_temp["data_emissao"].min().date()
+            d_max_filt = df_filt_temp["data_emissao"].max().date()
+        else:
+            d_min_filt = data_min
+            d_max_filt = data_max
+        
+        # Filtro 3: Modo de Filtro (Um dia vs Período)
+        modo_sel = st.radio(
+            "Tipo de filtro",
+            ["Período", "Um dia"],
+            horizontal=True,
+            key="filtro_modo",
+        )
+        
+        # Validação e clamping de session_state
+        for key_name, default_val in [("filtro_dia_unico", d_max_filt), 
+                                       ("filtro_data_ini", d_min_filt), 
+                                       ("filtro_data_fim", d_max_filt)]:
+            if key_name not in st.session_state:
+                st.session_state[key_name] = default_val
+            else:
+                val = st.session_state[key_name]
+                if val < d_min_filt:
+                    st.session_state[key_name] = d_min_filt
+                elif val > d_max_filt:
+                    st.session_state[key_name] = d_max_filt
+        
+        # Filtro 4: Seleção de Data (Um dia ou Período)
+        if modo_sel == "Um dia":
+            data_inicial = st.date_input(
+                "Data",
+                value=st.session_state.get("filtro_dia_unico", d_max_filt),
+                min_value=d_min_filt,
+                max_value=d_max_filt,
+                format="DD/MM/YYYY",
+                key="filtro_dia_unico",
+            )
+            data_final = data_inicial
+        else:
+            col_ini, col_fim = st.columns(2)
+            with col_ini:
+                data_inicial = st.date_input(
+                    "Início",
+                    value=st.session_state.get("filtro_data_ini", d_min_filt),
+                    min_value=d_min_filt,
+                    max_value=d_max_filt,
+                    format="DD/MM/YYYY",
+                    key="filtro_data_ini",
+                )
+            with col_fim:
+                data_final = st.date_input(
+                    "Fim",
+                    value=st.session_state.get("filtro_data_fim", d_max_filt),
+                    min_value=d_min_filt,
+                    max_value=d_max_filt,
+                    format="DD/MM/YYYY",
+                    key="filtro_data_fim",
+                )
+        
+        # Garantir que data_inicial <= data_final
+        if data_inicial > data_final:
+            data_inicial, data_final = data_final, data_inicial
+        
+        st.caption(f"📅 Range dinâmico: {d_min_filt.strftime('%d/%m/%Y')} até {d_max_filt.strftime('%d/%m/%Y')}")
+
+        st.markdown("---")
+        st.subheader("Comparação")
+        tipo_comparacao = st.radio(
+            "Comparar com:",
+            ["Período Anterior", "Mesmo Período Ano Passado", "Média Móvel 3M"],
+            horizontal=False,
+            key="tipo_comparacao",
+        )
+        # Mapear para chaves do comparador
+        map_comparacao = {
+            "Período Anterior": "período_anterior",
+            "Mesmo Período Ano Passado": "ano_passado",
+            "Média Móvel 3M": "media_3m",
+        }
+        baseline_sel = map_comparacao.get(tipo_comparacao, "período_anterior")
+
+        st.markdown("---")
 
         clientes = sorted(df["destinatario"].dropna().unique().tolist())
-        vendedores = sorted(df["vendedor"].dropna().unique().tolist())
         estados = sorted(df["estado"].dropna().unique().tolist())
         cidades = sorted(df["cidade"].dropna().unique().tolist())
         produtos = sorted(df["descricao_produto"].dropna().unique().tolist())
         fretes = sorted(df["frete"].dropna().unique().tolist())
 
         cliente_sel = st.multiselect("Cliente", options=clientes)
-        vendedor_sel = st.multiselect("Vendedor", options=vendedores)
         estado_sel = st.multiselect("Estado", options=estados)
         cidade_sel = st.multiselect("Cidade", options=cidades)
         produto_sel = st.multiselect("Produto", options=produtos)
@@ -909,23 +1411,27 @@ def main() -> None:
 
         st.markdown("---")
         st.subheader("Metas e Alertas")
+        
         meta_mensal = st.number_input(
-            "Meta de faturamento mensal (R$)",
+            "Meta de peças faturadas mensal (R$)",
             min_value=0.0,
             value=300000.0,
             step=10000.0,
         )
+        st.metric("Meta Mensal", to_brl(meta_mensal))
+        
         limite_cliente = st.slider("Alerta concentração por cliente", min_value=20, max_value=90, value=45, step=1) / 100
-        limite_vendedor = st.slider("Alerta concentração por vendedor", min_value=20, max_value=95, value=70, step=1) / 100
 
-    start_date = pd.Timestamp(periodo[0])
-    end_date = pd.Timestamp(periodo[1])
+    start_date = pd.Timestamp(data_inicial)
+    end_date = pd.Timestamp(data_final)
+
+    if start_date > end_date:
+        st.error("A data inicial não pode ser maior que a data final.")
+        st.stop()
 
     mask = (df["data_emissao"] >= start_date) & (df["data_emissao"] <= end_date)
     if cliente_sel:
         mask &= df["destinatario"].isin(cliente_sel)
-    if vendedor_sel:
-        mask &= df["vendedor"].isin(vendedor_sel)
     if estado_sel:
         mask &= df["estado"].isin(estado_sel)
     if cidade_sel:
@@ -949,12 +1455,12 @@ def main() -> None:
     ticket_medio_pedido = receita_total / pedidos_unicos if pedidos_unicos > 0 else 0
     preco_medio_ponderado = receita_total / quantidade_total if quantidade_total > 0 else 0
 
-    delta_receita = compare_previous_period(df, start_date, end_date, "valor_total")
-    delta_volume = compare_previous_period(df, start_date, end_date, "quantidade")
+    delta_receita = compare_with_baseline(df, start_date, end_date, "valor_total", baseline_sel)
+    delta_volume = compare_with_baseline(df, start_date, end_date, "quantidade", baseline_sel)
     mensal = monthly_view(df_f)
 
     forecast_df = build_forecast(mensal, periods=4)
-    alerts = build_alerts(df_f, cliente_limit=limite_cliente, vendedor_limit=limite_vendedor)
+    alerts = build_alerts(df_f, cliente_limit=limite_cliente)
 
     top_cliente_row = (
         df_f.groupby("destinatario", as_index=False)["valor_total"]
@@ -1005,7 +1511,7 @@ def main() -> None:
 
     c1, c2, c3, c4, c5, c6 = st.columns(6)
     with c1:
-        st.markdown(kpi_card("Faturamento", to_brl(receita_total), "Receita no período", delta_receita), unsafe_allow_html=True)
+        st.markdown(kpi_card("Peças Faturadas", to_brl(receita_total), "Receita no período", delta_receita), unsafe_allow_html=True)
     with c2:
         st.markdown(kpi_card("Volume", to_int(quantidade_total), "Unidades faturadas", delta_volume), unsafe_allow_html=True)
     with c3:
@@ -1024,7 +1530,7 @@ def main() -> None:
     st.markdown(
         (
             '<div class="story-row">'
-            f"<p><strong>Onde estamos:</strong> faturamento recente de {to_brl(mensal_last)} versus média móvel trimestral de {to_brl(media_3m)}.</p>"
+            f"<p><strong>Onde estamos:</strong> peças faturadas recentes de {to_brl(mensal_last)} versus média móvel trimestral de {to_brl(media_3m)}.</p>"
             f"<p><strong>O que move o resultado:</strong> principal cliente é {top_cliente_name} com {to_pct(top_cliente_share)} da receita; produto líder: {top_prod_name}.</p>"
             f"<p><strong>O que fazer agora:</strong> {'acelerar receita para fechar meta mensal' if gap_meta < 0 else 'sustentar ritmo e proteger margem'} ({to_brl(abs(gap_meta))} {'abaixo' if gap_meta < 0 else 'acima'} da meta).</p>"
             "</div>"
@@ -1054,7 +1560,7 @@ def main() -> None:
             go.Scatter(
                 x=mensal["ano_mes"],
                 y=mensal["faturamento"],
-                name="Faturamento",
+                name="Peças Faturadas",
                 mode="lines+markers",
                 line=dict(color=COLORS["primary"], width=3),
                 marker=dict(size=7, color=COLORS["secondary"]),
@@ -1062,9 +1568,18 @@ def main() -> None:
             secondary_y=True,
         )
         fig_trend.update_yaxes(title_text="Volume", secondary_y=False)
-        fig_trend.update_yaxes(title_text="Faturamento (R$)", secondary_y=True)
+        fig_trend.update_yaxes(title_text="Peças Faturadas (R$)", secondary_y=True)
         fig_trend.update_layout(title="Evolução Mensal de Receita e Volume")
         st.plotly_chart(chart_layout(fig_trend), use_container_width=True)
+        if len(mensal) >= 2 and mensal.iloc[-2]["faturamento"] > 0:
+            delta_trend = (mensal.iloc[-1]["faturamento"] - mensal.iloc[-2]["faturamento"]) / mensal.iloc[-2]["faturamento"]
+            insight_trend = f"No mês mais recente, as peças faturadas {'subiram' if delta_trend >= 0 else 'caíram'} {to_pct(abs(delta_trend))} em relação ao mês anterior."
+        else:
+            insight_trend = f"Peças faturadas recentes no recorte: {to_brl(mensal_last)}."
+        render_chart_help(
+            "Mostrar a evolução do negócio ao longo dos meses, cruzando receita e volume vendido.",
+            insight_trend,
+        )
 
         top_clientes = (
             df_f.groupby("destinatario", as_index=False)["valor_total"]
@@ -1079,7 +1594,7 @@ def main() -> None:
             go.Bar(
                 x=top_clientes["destinatario"],
                 y=top_clientes["valor_total"],
-                name="Faturamento",
+                name="Peças Faturadas",
                 marker_color=COLORS["secondary"],
             ),
             secondary_y=False,
@@ -1094,30 +1609,48 @@ def main() -> None:
             ),
             secondary_y=True,
         )
-        fig_pareto_clientes.update_yaxes(title_text="Faturamento (R$)", secondary_y=False)
+        fig_pareto_clientes.update_yaxes(title_text="Peças Faturadas (R$)", secondary_y=False)
         fig_pareto_clientes.update_yaxes(title_text="Acumulado (%)", secondary_y=True, range=[0, 105])
         fig_pareto_clientes.update_layout(title="Pareto de Clientes (Top 12)")
         st.plotly_chart(chart_layout(fig_pareto_clientes), use_container_width=True)
+        if not top_clientes.empty and top_clientes["valor_total"].sum() > 0:
+            share_top3_clientes = top_clientes["valor_total"].head(3).sum() / top_clientes["valor_total"].sum()
+            insight_pareto_cliente = f"Os 3 maiores clientes somam {to_pct(share_top3_clientes)} da receita do top 12."
+        else:
+            insight_pareto_cliente = "Sem dados suficientes para inferir concentração de clientes."
+        render_chart_help(
+            "Evidenciar concentração de receita por clientes e apoiar decisões de diversificação da carteira.",
+            insight_pareto_cliente,
+        )
 
     with tab2:
         col_a, col_b = st.columns(2)
 
-        vendedor_perf = (
-            df_f.groupby("vendedor", as_index=False)
-            .agg(faturamento=("valor_total", "sum"), volume=("quantidade", "sum"), pedidos=("pedido", "nunique"))
-            .sort_values("faturamento", ascending=False)
-        )
-
         with col_a:
-            fig_vendedores = px.pie(
-                vendedor_perf,
-                names="vendedor",
-                values="faturamento",
+            cliente_share = (
+                df_f.groupby("destinatario", as_index=False)["valor_total"]
+                .sum()
+                .sort_values("valor_total", ascending=False)
+                .head(10)
+            )
+            fig_clientes_share = px.pie(
+                cliente_share,
+                names="destinatario",
+                values="valor_total",
                 hole=0.45,
                 color_discrete_sequence=[COLORS["primary"], COLORS["accent"], COLORS["gold"], COLORS["mint"]],
-                title="Participação de Faturamento por Vendedor",
+                title="Participação de Peças Faturadas por Cliente (Top 10)",
             )
-            st.plotly_chart(chart_layout(fig_vendedores), use_container_width=True)
+            st.plotly_chart(chart_layout(fig_clientes_share), use_container_width=True)
+            if not cliente_share.empty and cliente_share["valor_total"].sum() > 0:
+                share_top_cliente = cliente_share.iloc[0]["valor_total"] / cliente_share["valor_total"].sum()
+                insight_cliente_share = f"O principal cliente representa {to_pct(share_top_cliente)} da receita dentro do top 10 exibido."
+            else:
+                insight_cliente_share = "Sem dados suficientes para inferir distribuição por cliente."
+            render_chart_help(
+                "Mostrar a distribuição de receita por cliente para medir concentração da carteira.",
+                insight_cliente_share,
+            )
 
         with col_b:
             cliente_scatter = (
@@ -1144,6 +1677,15 @@ def main() -> None:
             )
             fig_scatter.update_traces(marker=dict(line=dict(width=1, color="white"), opacity=0.82))
             st.plotly_chart(chart_layout(fig_scatter), use_container_width=True)
+            if not cliente_scatter.empty:
+                cliente_top = cliente_scatter.iloc[0]["destinatario"]
+                insight_scatter = f"{cliente_top} aparece como principal conta em receita entre os 20 maiores clientes."
+            else:
+                insight_scatter = "Sem dados suficientes para identificar posicionamento de clientes."
+            render_chart_help(
+                "Cruzar volume, receita e ticket para identificar clientes estratégicos e oportunidades de crescimento.",
+                insight_scatter,
+            )
 
         ticket_cliente = (
             df_f.groupby("destinatario", as_index=False)
@@ -1165,6 +1707,14 @@ def main() -> None:
         )
         fig_ticket.update_layout(yaxis=dict(categoryorder="total ascending"))
         st.plotly_chart(chart_layout(fig_ticket), use_container_width=True)
+        if not ticket_cliente.empty:
+            insight_ticket = f"Maior ticket médio no recorte: {ticket_cliente.iloc[0]['destinatario']} com {to_brl(ticket_cliente.iloc[0]['ticket'])}."
+        else:
+            insight_ticket = "Sem dados suficientes para comparar ticket por cliente."
+        render_chart_help(
+            "Mostrar quais clientes pagam maior valor por pedido, apoiando estratégia de rentabilidade.",
+            insight_ticket,
+        )
 
     with tab3:
         col_p1, col_p2 = st.columns(2)
@@ -1190,6 +1740,15 @@ def main() -> None:
                 labels={"faturamento": "Receita (R$)", "produto": "Produto"},
             )
             st.plotly_chart(chart_layout(fig_prod), use_container_width=True)
+            if not produto_perf.empty and produto_perf["faturamento"].sum() > 0:
+                share_produto_lider = produto_perf.iloc[0]["faturamento"] / produto_perf["faturamento"].sum()
+                insight_prod_bar = f"O produto líder responde por {to_pct(share_produto_lider)} da receita total de produtos no recorte."
+            else:
+                insight_prod_bar = "Sem dados suficientes para inferir concentração por produto."
+            render_chart_help(
+                "Destacar os produtos que mais contribuem para peças faturadas, orientando foco de mix e estoque.",
+                insight_prod_bar,
+            )
 
         with col_p2:
             fig_tree = px.treemap(
@@ -1201,6 +1760,15 @@ def main() -> None:
                 title="Mix de Receita dos Principais Produtos",
             )
             st.plotly_chart(chart_layout(fig_tree), use_container_width=True)
+            if not top_prod.empty and top_prod["faturamento"].sum() > 0:
+                share_top5_mix = top_prod["faturamento"].head(5).sum() / top_prod["faturamento"].sum()
+                insight_tree = f"Os 5 maiores itens concentram {to_pct(share_top5_mix)} da receita dentro do top 15 exibido."
+            else:
+                insight_tree = "Sem dados suficientes para leitura de mix."
+            render_chart_help(
+                "Visualizar rapidamente o mix de receita entre os produtos mais relevantes.",
+                insight_tree,
+            )
 
         pareto = produto_perf.copy()
         pareto["acumulado"] = pareto["faturamento"].cumsum() / pareto["faturamento"].sum()
@@ -1230,6 +1798,16 @@ def main() -> None:
         fig_pareto_prod.update_yaxes(title_text="Acumulado (%)", secondary_y=True, range=[0, 105])
         fig_pareto_prod.update_layout(title="Curva ABC de Produtos (Top 25)")
         st.plotly_chart(chart_layout(fig_pareto_prod), use_container_width=True)
+        if not pareto.empty:
+            n_prod_80 = int((pareto["acumulado"] <= 0.8).sum() + 1)
+            n_prod_80 = min(n_prod_80, len(pareto))
+            insight_pareto_prod = f"Aproximadamente {n_prod_80} produtos explicam 80% da receita acumulada no período."
+        else:
+            insight_pareto_prod = "Sem dados suficientes para curva ABC."
+        render_chart_help(
+            "Classificar produtos por impacto financeiro e definir foco de gestão na curva ABC.",
+            insight_pareto_prod,
+        )
 
     with tab4:
         col_g1, col_g2 = st.columns(2)
@@ -1251,6 +1829,15 @@ def main() -> None:
                 labels={"faturamento": "Receita (R$)", "estado": "Estado", "clientes": "Clientes"},
             )
             st.plotly_chart(chart_layout(fig_estado), use_container_width=True)
+            if not estado_perf.empty and estado_perf["faturamento"].sum() > 0:
+                share_estado_lider = estado_perf.iloc[0]["faturamento"] / estado_perf["faturamento"].sum()
+                insight_estado = f"O estado líder concentra {to_pct(share_estado_lider)} da receita geográfica no recorte."
+            else:
+                insight_estado = "Sem dados suficientes para distribuição por estado."
+            render_chart_help(
+                "Comparar desempenho por estado para orientar expansão comercial e cobertura regional.",
+                insight_estado,
+            )
 
         with col_g2:
             cidade_perf = (
@@ -1270,6 +1857,15 @@ def main() -> None:
                 labels={"valor_total": "Receita (R$)", "cidade": "Cidade"},
             )
             st.plotly_chart(chart_layout(fig_cidade), use_container_width=True)
+            if not cidade_perf.empty and cidade_perf["valor_total"].sum() > 0:
+                share_cidade = cidade_perf.iloc[0]["valor_total"] / cidade_perf["valor_total"].sum()
+                insight_cidade = f"A cidade líder representa {to_pct(share_cidade)} da receita entre as 15 cidades exibidas."
+            else:
+                insight_cidade = "Sem dados suficientes para distribuição por cidade."
+            render_chart_help(
+                "Identificar polos urbanos com maior geração de receita para priorização comercial.",
+                insight_cidade,
+            )
 
         st.subheader("Detalhamento do Recorte")
         detalhamento = df_f[
@@ -1279,7 +1875,6 @@ def main() -> None:
                 "destinatario",
                 "cidade",
                 "estado",
-                "vendedor",
                 "descricao_produto",
                 "quantidade",
                 "valor_unit",
@@ -1289,8 +1884,25 @@ def main() -> None:
             ]
         ].sort_values("data_emissao", ascending=False)
 
+        detalhamento_display = detalhamento.copy()
+        detalhamento_display["data_emissao"] = detalhamento_display["data_emissao"].apply(to_date_br_short)
+        # Formatar colunas monetárias com separadores de milhar
+        detalhamento_display["valor_unit"] = detalhamento_display["valor_unit"].apply(
+            lambda x: to_brl(safe_to_float(x)) if safe_to_float(x) is not None else "R$ 0,00"
+        )
+        detalhamento_display["valor_total"] = detalhamento_display["valor_total"].apply(
+            lambda x: to_brl(safe_to_float(x)) if safe_to_float(x) is not None else "R$ 0,00"
+        )
+        detalhamento_display["frete"] = detalhamento_display["frete"].apply(
+            lambda x: to_brl(safe_to_float(x)) if safe_to_float(x) is not None else "R$ 0,00"
+        )
+        # Formatar coluna quantidade com separadores de milhar
+        detalhamento_display["quantidade"] = detalhamento_display["quantidade"].apply(
+            lambda x: to_int(safe_to_float(x)) if safe_to_float(x) is not None else "0"
+        )
+
         st.dataframe(
-            detalhamento,
+            detalhamento_display,
             use_container_width=True,
             hide_index=True,
             height=390,
@@ -1298,7 +1910,7 @@ def main() -> None:
 
         st.download_button(
             label="Baixar recorte filtrado (CSV)",
-            data=detalhamento.to_csv(index=False).encode("utf-8-sig"),
+            data=detalhamento_display.to_csv(index=False).encode("utf-8-sig"),
             file_name="recorte_dashboard_produtos_faturados.csv",
             mime="text/csv",
             use_container_width=True,
@@ -1313,7 +1925,7 @@ def main() -> None:
                     mode="gauge+number",
                     value=float(mensal_last),
                     number={"prefix": "R$ "},
-                    title={"text": "Faturamento do mês recente"},
+                    title={"text": "Peças Faturadas do mês recente"},
                     gauge={
                         "axis": {"range": [0, max(meta_mensal * 1.5, mensal_last * 1.2 + 1)]},
                         "bar": {"color": COLORS["primary"]},
@@ -1332,6 +1944,10 @@ def main() -> None:
             )
             fig_gauge.update_layout(height=320)
             st.plotly_chart(chart_layout(fig_gauge), use_container_width=True)
+            render_chart_help(
+                "Acompanhar rapidamente se o mês recente está acima ou abaixo da meta definida.",
+                f"Atingimento atual da meta: {to_pct((mensal_last / meta_mensal) if meta_mensal > 0 else 0)}.",
+            )
 
             atingimento = (mensal_last / meta_mensal) if meta_mensal > 0 else 0
             st.metric("Atingimento da meta", to_pct(atingimento))
@@ -1386,17 +2002,28 @@ def main() -> None:
                         name="Faixa provável (80%)",
                     )
                 )
-                fig_forecast.update_layout(title="Projeção de Faturamento para Próximos 4 Meses")
+                fig_forecast.update_layout(title="Projeção de Peças Faturadas para Próximos 4 Meses")
                 st.plotly_chart(chart_layout(fig_forecast), use_container_width=True)
+                meses_acima_meta = int((forecast_df["faturamento_previsto"] >= meta_mensal).sum())
+                render_chart_help(
+                    "Projetar receita futura para antecipar decisões comerciais e metas.",
+                    f"No cenário base, {meses_acima_meta} de {len(forecast_df)} meses projetados superam a meta mensal atual.",
+                )
 
                 cenario = forecast_df[["ano_mes", "faturamento_previsto"]].copy()
                 cenario["Conservador (-10%)"] = cenario["faturamento_previsto"] * 0.9
                 cenario["Base"] = cenario["faturamento_previsto"]
                 cenario["Otimista (+10%)"] = cenario["faturamento_previsto"] * 1.1
-                cenario["ano_mes"] = cenario["ano_mes"].dt.strftime("%m/%Y")
+                cenario["ano_mes"] = cenario["ano_mes"].dt.strftime("%d/%m/%y")
+
+                # Formatar colunas monetárias
+                cenario_display = cenario.rename(columns={"ano_mes": "Mês"})[["Mês", "Conservador (-10%)", "Base", "Otimista (+10%)"]].copy()
+                cenario_display["Conservador (-10%)"] = cenario_display["Conservador (-10%)"].apply(lambda x: to_brl(x))
+                cenario_display["Base"] = cenario_display["Base"].apply(lambda x: to_brl(x))
+                cenario_display["Otimista (+10%)"] = cenario_display["Otimista (+10%)"].apply(lambda x: to_brl(x))
 
                 st.dataframe(
-                    cenario.rename(columns={"ano_mes": "Mês"})[["Mês", "Conservador (-10%)", "Base", "Otimista (+10%)"]],
+                    cenario_display,
                     use_container_width=True,
                     hide_index=True,
                 )

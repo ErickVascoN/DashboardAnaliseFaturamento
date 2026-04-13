@@ -1,10 +1,10 @@
-# Dashboard Executivo - Produtos Faturados
+# Análise de Produtos Faturados
 
-Dashboard visual e dinâmico para análise de produtos faturados, conectado em tempo real ao Google Sheets.
+Dashboard visual e dinâmico para análise de produtos faturados em tempo real.
 
 ## O que este painel entrega
 
-- KPIs executivos: faturamento, volume, pedidos, ticket médio e preço médio ponderado.
+- KPIs executivos: peças faturadas, volume, pedidos, ticket médio e preço médio ponderado.
 - Narrativa executiva de 60 segundos para abrir apresentação com contexto e foco.
 - Modo Apresentação com roteiro guiado em 4 etapas: Panorama, Riscos, Oportunidades e Plano.
 - Alertas inteligentes com semáforo de risco (concentração, queda de receita e dispersão de preço).
@@ -12,7 +12,7 @@ Dashboard visual e dinâmico para análise de produtos faturados, conectado em t
 - Aba de previsão para os próximos 4 meses com faixa provável e cenários conservador/base/otimista.
 - Evolução mensal com comparação de período anterior.
 - Pareto de clientes e curva ABC de produtos.
-- Análise comercial por vendedor e clientes.
+- Análise comercial por clientes.
 - Análise geográfica por estado e cidade.
 - Tabela detalhada com download do recorte filtrado.
 

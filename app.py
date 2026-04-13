@@ -843,7 +843,7 @@ def render_narrative_section(mensal_last: float, media_3m: float, top_cliente_na
     insights = generate_insights_from_metrics(mensal_last, media_3m, top_cliente_share, gap_meta, meta_mensal)
     st.markdown('<div class="insight-box">' + "".join([f"<p>• {i}</p>" for i in insights]) + "</div>", unsafe_allow_html=True)
 
-    st.subheader("Narrativa Executiva em 60 Segundos")
+    st.subheader("Resumo Executivo")
     st.markdown(
         (
             '<div class="story-row">'

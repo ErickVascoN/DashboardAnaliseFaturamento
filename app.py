@@ -73,8 +73,8 @@ def inject_styles() -> None:
             }
 
             [data-testid="stSidebar"] {
-                background: linear-gradient(180deg, #0B132B 0%, #15213f 100%);
-                border-right: 1px solid rgba(255, 255, 255, 0.08);
+                background: linear-gradient(180deg, #f5f8fc 0%, #eef2f9 100%);
+                border-right: 1px solid rgba(29, 53, 87, 0.12);
             }
 
             [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p,
@@ -84,37 +84,37 @@ def inject_styles() -> None:
             [data-testid="stSidebar"] label,
             [data-testid="stSidebar"] [data-testid="stWidgetLabel"] p,
             [data-testid="stSidebar"] .stCaption {
-                color: #e9f1ff !important;
+                color: #1d3557 !important;
                 font-family: 'Space Grotesk', sans-serif;
             }
 
             [data-testid="stSidebar"] [data-baseweb="input"] > div,
             [data-testid="stSidebar"] [data-baseweb="select"] > div,
             [data-testid="stSidebar"] [data-baseweb="textarea"] > div {
-                background: rgba(255, 255, 255, 0.96) !important;
-                border: 1px solid rgba(19, 36, 69, 0.24) !important;
+                background: rgba(255, 255, 255, 0.98) !important;
+                border: 1.5px solid rgba(29, 53, 87, 0.2) !important;
             }
 
             [data-testid="stSidebar"] input,
             [data-testid="stSidebar"] textarea,
             [data-testid="stSidebar"] [data-baseweb="select"] input {
-                color: #132445 !important;
-                -webkit-text-fill-color: #132445 !important;
+                color: #1d3557 !important;
+                -webkit-text-fill-color: #1d3557 !important;
                 font-weight: 500;
             }
 
             [data-testid="stSidebar"] input::placeholder,
             [data-testid="stSidebar"] textarea::placeholder {
-                color: #5a6b8f !important;
+                color: #7a8ca8 !important;
                 opacity: 1;
             }
 
             [data-testid="stSidebar"] [data-baseweb="slider"] [role="slider"] {
-                background-color: #ff5a54 !important;
+                background-color: #e76f51 !important;
             }
 
             [data-testid="stSidebar"] [data-baseweb="slider"] > div > div {
-                background: rgba(255, 255, 255, 0.3) !important;
+                background: rgba(29, 53, 87, 0.15) !important;
             }
 
             [data-baseweb="tab-list"] {
@@ -123,17 +123,17 @@ def inject_styles() -> None:
             }
 
             [data-baseweb="tab-list"] button {
-                color: #2b3b5f !important;
+                color: #1d3557 !important;
                 font-weight: 700;
-                background: rgba(255, 255, 255, 0.6);
+                background: rgba(255, 255, 255, 0.8);
                 border-radius: 10px 10px 0 0;
                 padding: 0.4rem 0.7rem;
             }
 
             [data-baseweb="tab-list"] button[aria-selected="true"] {
-                color: #c33024 !important;
-                background: rgba(255, 255, 255, 0.92);
-                border-bottom: 2px solid #c33024;
+                color: #ffffff !important;
+                background: #0c6e74;
+                border-bottom: 2px solid #0c6e74;
             }
 
             [data-baseweb="tab-panel"] {
@@ -1526,7 +1526,7 @@ def main() -> None:
     insights = generate_insights(df_f)
     st.markdown('<div class="insight-box">' + "".join([f"<p>• {i}</p>" for i in insights]) + "</div>", unsafe_allow_html=True)
 
-    st.subheader("Narrativa Executiva em 60 Segundos")
+    st.subheader("Resumo Executivo")
     st.markdown(
         (
             '<div class="story-row">'

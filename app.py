@@ -555,15 +555,16 @@ def categorize_product(product_name: str) -> str:
     
     # Mapeamento de palavras-chave → categoria
     mapping = {
-        "Cobertores": ["cobertor"],
-        "Colchas": ["colcha"],
-        "Cortinas": ["cortina"],
-        "Fronhas": ["fronha"],
-        "Jogos de Cama": ["jogo", "jg "],
-        "Kits": ["kit"],
-        "Mantas": ["manta"],
-        "Edredons": ["edredon"],
-        "Almofadas": ["almofada"],
+        "Cobertores": ["COBERTOR"],
+        "Colchas": ["COLCHA"],
+        "Cortinas": ["CORTINA"],
+        "Fronhas": ["FRONHA"],
+        "Jogos de Cama": ["JOGO", "JG "],
+        "Kits": ["KIT"],
+        "Mantas": ["MANTA"],
+        "Edredons": ["EDREDON"],
+        "Almofadas": ["ALMOFADA"],
+        "Lençóis": ["LENCO"],  # Adicionar lençóis também
     }
     
     for categoria, keywords in mapping.items():

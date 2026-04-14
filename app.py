@@ -1542,8 +1542,21 @@ def main() -> None:
         cliente_sel = st.multiselect("Cliente", options=clientes)
         estado_sel = st.multiselect("Estado", options=estados)
         cidade_sel = st.multiselect("Cidade", options=cidades)
-        produto_sel = st.multiselect("Produto", options=produtos)
+        
+        # Seleção de grupo (ANTES de produtos)
         grupo_sel = st.multiselect("Grupo de Produto", options=grupos)
+        
+        # Se grupos forem selecionados, filtrar produtos para mostrar apenas do grupo
+        if grupo_sel:
+            produtos_filtrados = sorted(
+                df[df["grupo_produto"].isin(grupo_sel)]["descricao_produto"].dropna().unique().tolist()
+            )
+        else:
+            produtos_filtrados = produtos
+        
+        # Filtro de produtos (agora dinâmico baseado na seleção de grupo)
+        produto_sel = st.multiselect("Produto", options=produtos_filtrados)
+        
         tamanho_sel = st.multiselect("Tamanho", options=tamanhos)
         cor_sel = st.multiselect("Cor", options=cores)
         frete_sel = st.multiselect("Frete", options=fretes)

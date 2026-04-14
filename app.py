@@ -483,23 +483,37 @@ def categorize_size(product_name: str) -> str:
 
 
 def categorize_color(product_name: str) -> str:
-    """Extrai cor/padrão do nome do produto."""
+    """Extrai cor específica do nome do produto."""
     if not product_name:
         return "Indefinido"
     
     name = normalize_text(product_name).upper()
     
-    # Padrões de cor/estilo
-    if "sortido" in name:
-        return "Sortido"
-    elif "stripes" in name or "strp" in name:
-        return "Stripes"
-    elif "bonded" in name or "sherpa" in name:
-        return "Bonded/Sherpa"
-    elif "kids" in name:
-        return "Kids"
-    else:
-        return "Indefinido"
+    # Cores específicas - em ordem de especificidade
+    color_map = {
+        "Rosa": ["rosa", "pink"],
+        "Azul": ["azul", "blue"],
+        "Verde": ["verde", "green"],
+        "Vermelho": ["vermelho", "red", "rojo"],
+        "Cinza": ["cinza", "grey", "gray"],
+        "Preto": ["preto", "negro", "black"],
+        "Branco": ["branco", "white", "bco"],
+        "Roxo": ["roxo", "lilas", "lilás", "purple", "violet"],
+        "Marrom": ["marrom", "brown", "chocolate", "cafe", "café", "berinjel"],
+        "Amarelo": ["amarelo", "yellow", "ouro"],
+        "Laranja": ["laranja", "orange"],
+        "Bege": ["bege", "beige", "areia", "cream"],
+        "Sortido": ["sortido"],
+        "Stripes": ["stripes", "strp", "listrad"],
+        "Bonded/Sherpa": ["bonded", "sherpa"],
+    }
+    
+    for cor_nome, variantes in color_map.items():
+        for variante in variantes:
+            if variante in name:
+                return cor_nome
+    
+    return "Indefinido"
 
 
 def categorize_product(product_name: str) -> str:

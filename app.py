@@ -471,6 +471,31 @@ def is_dimension(word: str) -> bool:
     return "X" in word and any(c.isdigit() for c in word)
 
 
+def is_valid_color_word(word: str) -> bool:
+    """Verifica se uma palavra é válida como cor (não é código/número)."""
+    if not word or len(word) <= 2:
+        return False
+    
+    word_upper = word.upper()
+    
+    # Pula abreviações comuns que não são cores
+    skip_words = {"SORT", "EST", "SHU", "LS", "MCF", "EL", "CL", "CS", "DIV", "ES", "GSM", "REAP", "PET", "DEC"}
+    if word_upper in skip_words:
+        return False
+    
+    # Pula palavras que são principalmente números/hífens (como "18-0", "17-0610")
+    digit_count = sum(1 for c in word if c.isdigit() or c == "-")
+    if digit_count > len(word) * 0.5:  # Se mais de 50% é número/hífen
+        return False
+    
+    # Deve ter pelo menos 3 caracteres e ser principalmente letras
+    letter_count = sum(1 for c in word if c.isalpha())
+    if letter_count < len(word) * 0.6:  # Menos de 60% de letras é suspeito
+        return False
+    
+    return True
+
+
 def categorize_size(product_name: str) -> str:
     """Extrai tamanho/dimensão do nome do produto."""
     if not product_name:
@@ -499,14 +524,14 @@ def categorize_size(product_name: str) -> str:
 
 
 def categorize_color(product_name: str) -> str:
-    """Extrai a cor, pulando dimensões no final do nome."""
+    """Extrai a cor, pulando dimensões e códigos no final do nome."""
     if not product_name:
         return "Indefinido"
     
     # Remove espaços extras e pega palavras em ordem reversa (do final para o início)
     palavras = str(product_name).strip().split()
     
-    # Procura de trás para frente, pulando dimensões
+    # Procura de trás para frente, pulando dimensões e palavras inválidas
     for i in range(len(palavras) - 1, -1, -1):
         palavra = palavras[i].strip().rstrip(".,;-")
         
@@ -514,11 +539,9 @@ def categorize_color(product_name: str) -> str:
         if not palavra or is_dimension(palavra):
             continue
         
-        # Pula palavras muito curtas que são provavelmente separadores
-        if len(palavra) <= 1:
-            continue
-        
-        return palavra
+        # Verifica se é uma palavra válida como cor
+        if is_valid_color_word(palavra):
+            return palavra
     
     return "Indefinido"
 

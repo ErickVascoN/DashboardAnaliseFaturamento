@@ -1557,8 +1557,30 @@ def main() -> None:
         # Filtro de produtos (agora dinâmico baseado na seleção de grupo)
         produto_sel = st.multiselect("Produto", options=produtos_filtrados)
         
-        tamanho_sel = st.multiselect("Tamanho", options=tamanhos)
-        cor_sel = st.multiselect("Cor", options=cores)
+        # Filtros de tamanho e cor dinâmicos baseados em produtos selecionados
+        if produto_sel:
+            # Se produtos foram selecionados, mostrar apenas tamanhos/cores daqueles produtos
+            tamanhos_filtrados = sorted(
+                df[df["descricao_produto"].isin(produto_sel)]["tamanho"].dropna().unique().tolist()
+            )
+            cores_filtradas = sorted(
+                df[df["descricao_produto"].isin(produto_sel)]["cor"].dropna().unique().tolist()
+            )
+        elif grupo_sel:
+            # Se só grupo foi selecionado (sem produtos), mostrar tamanhos/cores do grupo
+            tamanhos_filtrados = sorted(
+                df[df["grupo_produto"].isin(grupo_sel)]["tamanho"].dropna().unique().tolist()
+            )
+            cores_filtradas = sorted(
+                df[df["grupo_produto"].isin(grupo_sel)]["cor"].dropna().unique().tolist()
+            )
+        else:
+            # Se nada foi selecionado, mostrar tudo
+            tamanhos_filtrados = tamanhos
+            cores_filtradas = cores
+        
+        tamanho_sel = st.multiselect("Tamanho", options=tamanhos_filtrados)
+        cor_sel = st.multiselect("Cor", options=cores_filtradas)
         frete_sel = st.multiselect("Frete", options=fretes)
 
         st.markdown("---")

@@ -464,6 +464,34 @@ def parse_best_date(series: pd.Series) -> pd.Series:
     return second
 
 
+def categorize_product(product_name: str) -> str:
+    """Agrupa produtos baseado em palavras-chave no nome."""
+    if not product_name:
+        return "Outros"
+    
+    name = normalize_text(product_name).upper()
+    
+    # Mapeamento de palavras-chave → categoria
+    mapping = {
+        "Cobertores": ["cobertor"],
+        "Colchas": ["colcha"],
+        "Cortinas": ["cortina"],
+        "Fronhas": ["fronha"],
+        "Jogos de Cama": ["jogo", "jg "],
+        "Kits": ["kit"],
+        "Mantas": ["manta"],
+        "Edredons": ["edredon"],
+        "Almofadas": ["almofada"],
+    }
+    
+    for categoria, keywords in mapping.items():
+        for keyword in keywords:
+            if keyword in name:
+                return categoria
+    
+    return "Outros"
+
+
 def canonical_column_names(columns: list[str]) -> dict[str, str]:
     renamed: dict[str, str] = {}
     for original in columns:
@@ -499,12 +527,6 @@ def canonical_column_names(columns: list[str]) -> dict[str, str]:
             renamed[original] = "descricao_produto"
         elif "situ" in key:
             renamed[original] = "situacao"
-        elif "grupo" in key:
-            renamed[original] = "grupo_produto"
-        elif key == "cor":
-            renamed[original] = "cor"
-        elif key == "tamanho" or key == "tamanho":
-            renamed[original] = "tamanho"
         else:
             renamed[original] = key
     return renamed
@@ -542,6 +564,9 @@ def load_data(sheet_url: str) -> pd.DataFrame:
     
     df = pd.read_csv(io.StringIO(csv_text), dtype=str)
     df = df.rename(columns=canonical_column_names(list(df.columns)))
+    
+    # Criar coluna de grupo de produto dinamicamente baseado no nome
+    df["grupo_produto"] = df["descricao_produto"].apply(categorize_product)
 
     required_cols = [
         "data_emissao",
@@ -1268,27 +1293,6 @@ def main() -> None:
         st.warning("A planilha não retornou dados válidos no recorte atual.")
         st.stop()
 
-    # Debug: Mostrar colunas disponíveis para diagnosticar filtros faltantes
-    with st.expander("🔧 Colunas Disponíveis (Debug)"):
-        st.code(f"Colunas carregadas: {list(df.columns)}", language="python")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric("Total de Colunas", len(df.columns))
-            st.metric("Total de Linhas", len(df))
-        with col2:
-            if "grupo_produto" in df.columns:
-                st.success("✅ grupo_produto encontrada")
-            else:
-                st.warning("❌ grupo_produto não encontrada")
-            if "cor" in df.columns:
-                st.success("✅ cor encontrada")
-            else:
-                st.warning("❌ cor não encontrada")
-            if "tamanho" in df.columns:
-                st.success("✅ tamanho encontrada")
-            else:
-                st.warning("❌ tamanho não encontrada")
-
     data_min = df["data_emissao"].min().date()
     data_max = df["data_emissao"].max().date()
     data_max_ano = date(data_max.year, 12, 31)
@@ -1446,30 +1450,13 @@ def main() -> None:
         cidades = sorted(df["cidade"].dropna().unique().tolist())
         produtos = sorted(df["descricao_produto"].dropna().unique().tolist())
         fretes = sorted(df["frete"].dropna().unique().tolist())
-        grupos = sorted(df["grupo_produto"].dropna().unique().tolist()) if "grupo_produto" in df.columns else []
-        cores = sorted(df["cor"].dropna().unique().tolist()) if "cor" in df.columns else []
-        tamanhos = sorted(df["tamanho"].dropna().unique().tolist()) if "tamanho" in df.columns else []
+        grupos = sorted(df["grupo_produto"].dropna().unique().tolist())
 
         cliente_sel = st.multiselect("Cliente", options=clientes)
         estado_sel = st.multiselect("Estado", options=estados)
         cidade_sel = st.multiselect("Cidade", options=cidades)
         produto_sel = st.multiselect("Produto", options=produtos)
-        
-        if grupos:
-            grupo_sel = st.multiselect("Grupo de Produto", options=grupos)
-        else:
-            grupo_sel = []
-        
-        if cores:
-            cor_sel = st.multiselect("Cor", options=cores)
-        else:
-            cor_sel = []
-        
-        if tamanhos:
-            tamanho_sel = st.multiselect("Tamanho", options=tamanhos)
-        else:
-            tamanho_sel = []
-        
+        grupo_sel = st.multiselect("Grupo de Produto", options=grupos)
         frete_sel = st.multiselect("Frete", options=fretes)
 
         st.markdown("---")
@@ -1501,12 +1488,8 @@ def main() -> None:
         mask &= df["cidade"].isin(cidade_sel)
     if produto_sel:
         mask &= df["descricao_produto"].isin(produto_sel)
-    if grupo_sel and "grupo_produto" in df.columns:
+    if grupo_sel:
         mask &= df["grupo_produto"].isin(grupo_sel)
-    if cor_sel and "cor" in df.columns:
-        mask &= df["cor"].isin(cor_sel)
-    if tamanho_sel and "tamanho" in df.columns:
-        mask &= df["tamanho"].isin(tamanho_sel)
     if frete_sel:
         mask &= df["frete"].isin(frete_sel)
 

@@ -464,6 +464,44 @@ def parse_best_date(series: pd.Series) -> pd.Series:
     return second
 
 
+def categorize_size(product_name: str) -> str:
+    """Extrai tamanho do nome do produto."""
+    if not product_name:
+        return "Indefinido"
+    
+    name = normalize_text(product_name).upper()
+    
+    # Padrões de tamanho em ordem de especificidade
+    if "queen" in name:
+        return "Queen"
+    elif "casal" in name:
+        return "Casal"
+    elif "solteiro" in name or "solt" in name:
+        return "Solteiro"
+    else:
+        return "Indefinido"
+
+
+def categorize_color(product_name: str) -> str:
+    """Extrai cor/padrão do nome do produto."""
+    if not product_name:
+        return "Indefinido"
+    
+    name = normalize_text(product_name).upper()
+    
+    # Padrões de cor/estilo
+    if "sortido" in name:
+        return "Sortido"
+    elif "stripes" in name or "strp" in name:
+        return "Stripes"
+    elif "bonded" in name or "sherpa" in name:
+        return "Bonded/Sherpa"
+    elif "kids" in name:
+        return "Kids"
+    else:
+        return "Indefinido"
+
+
 def categorize_product(product_name: str) -> str:
     """Agrupa produtos baseado em palavras-chave no nome."""
     if not product_name:
@@ -565,8 +603,10 @@ def load_data(sheet_url: str) -> pd.DataFrame:
     df = pd.read_csv(io.StringIO(csv_text), dtype=str)
     df = df.rename(columns=canonical_column_names(list(df.columns)))
     
-    # Criar coluna de grupo de produto dinamicamente baseado no nome
+    # Criar colunas dinamicamente baseado no nome do produto
     df["grupo_produto"] = df["descricao_produto"].apply(categorize_product)
+    df["tamanho"] = df["descricao_produto"].apply(categorize_size)
+    df["cor"] = df["descricao_produto"].apply(categorize_color)
 
     required_cols = [
         "data_emissao",
@@ -1451,12 +1491,16 @@ def main() -> None:
         produtos = sorted(df["descricao_produto"].dropna().unique().tolist())
         fretes = sorted(df["frete"].dropna().unique().tolist())
         grupos = sorted(df["grupo_produto"].dropna().unique().tolist())
+        tamanhos = sorted(df["tamanho"].dropna().unique().tolist())
+        cores = sorted(df["cor"].dropna().unique().tolist())
 
         cliente_sel = st.multiselect("Cliente", options=clientes)
         estado_sel = st.multiselect("Estado", options=estados)
         cidade_sel = st.multiselect("Cidade", options=cidades)
         produto_sel = st.multiselect("Produto", options=produtos)
         grupo_sel = st.multiselect("Grupo de Produto", options=grupos)
+        tamanho_sel = st.multiselect("Tamanho", options=tamanhos)
+        cor_sel = st.multiselect("Cor", options=cores)
         frete_sel = st.multiselect("Frete", options=fretes)
 
         st.markdown("---")
@@ -1490,6 +1534,10 @@ def main() -> None:
         mask &= df["descricao_produto"].isin(produto_sel)
     if grupo_sel:
         mask &= df["grupo_produto"].isin(grupo_sel)
+    if tamanho_sel:
+        mask &= df["tamanho"].isin(tamanho_sel)
+    if cor_sel:
+        mask &= df["cor"].isin(cor_sel)
     if frete_sel:
         mask &= df["frete"].isin(frete_sel)
 

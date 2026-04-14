@@ -464,38 +464,61 @@ def parse_best_date(series: pd.Series) -> pd.Series:
     return second
 
 
+def is_dimension(word: str) -> bool:
+    """Verifica se uma palavra é uma dimensão (ex: 1.40X2.00, 0.47X0.65)."""
+    word = str(word).strip().upper()
+    # Dimensões têm X e contêm números
+    return "X" in word and any(c.isdigit() for c in word)
+
+
 def categorize_size(product_name: str) -> str:
-    """Extrai tamanho do nome do produto."""
+    """Extrai tamanho/dimensão do nome do produto."""
     if not product_name:
         return "Indefinido"
     
-    name = normalize_text(product_name).upper()
+    name = str(product_name).strip()
     
-    # Padrões de tamanho em ordem de especificidade
-    if "queen" in name:
+    # Procura por dimensões explícitas (1.40X2.00, 0.47X0.65, etc)
+    palavras = name.split()
+    for palavra in palavras:
+        palavra_limpa = palavra.rstrip(".,;-")
+        if is_dimension(palavra_limpa):
+            return palavra_limpa
+    
+    # Se não encontrar dimensão, procura por palavras-chave de tamanho
+    name_upper = normalize_text(name).upper()
+    
+    if "queen" in name_upper:
         return "Queen"
-    elif "casal" in name:
+    elif "casal" in name_upper:
         return "Casal"
-    elif "solteiro" in name or "solt" in name:
+    elif "solteiro" in name_upper or "solt" in name_upper:
         return "Solteiro"
     else:
         return "Indefinido"
 
 
 def categorize_color(product_name: str) -> str:
-    """Extrai a cor como última palavra do nome do produto."""
+    """Extrai a cor, pulando dimensões no final do nome."""
     if not product_name:
         return "Indefinido"
     
-    # Remove espaços extras e pega a última palavra
+    # Remove espaços extras e pega palavras em ordem reversa (do final para o início)
     palavras = str(product_name).strip().split()
     
-    if palavras:
-        ultima_palavra = palavras[-1].strip()
-        # Remove caracteres especiais das extremidades
-        ultima_palavra = ultima_palavra.rstrip(".,;-")
-        if ultima_palavra:
-            return ultima_palavra
+    # Procura de trás para frente, pulando dimensões
+    for i in range(len(palavras) - 1, -1, -1):
+        palavra = palavras[i].strip().rstrip(".,;-")
+        
+        # Pula palavras vazias ou dimensões
+        if not palavra or is_dimension(palavra):
+            continue
+        
+        # Pula palavras muito curtas que são provavelmente separadores
+        if len(palavra) <= 1:
+            continue
+        
+        return palavra
     
     return "Indefinido"
 

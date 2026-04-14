@@ -499,6 +499,12 @@ def canonical_column_names(columns: list[str]) -> dict[str, str]:
             renamed[original] = "descricao_produto"
         elif "situ" in key:
             renamed[original] = "situacao"
+        elif "grupo" in key:
+            renamed[original] = "grupo_produto"
+        elif key == "cor":
+            renamed[original] = "cor"
+        elif key == "tamanho" or key == "tamanho":
+            renamed[original] = "tamanho"
         else:
             renamed[original] = key
     return renamed
@@ -1415,11 +1421,30 @@ def main() -> None:
         cidades = sorted(df["cidade"].dropna().unique().tolist())
         produtos = sorted(df["descricao_produto"].dropna().unique().tolist())
         fretes = sorted(df["frete"].dropna().unique().tolist())
+        grupos = sorted(df["grupo_produto"].dropna().unique().tolist()) if "grupo_produto" in df.columns else []
+        cores = sorted(df["cor"].dropna().unique().tolist()) if "cor" in df.columns else []
+        tamanhos = sorted(df["tamanho"].dropna().unique().tolist()) if "tamanho" in df.columns else []
 
         cliente_sel = st.multiselect("Cliente", options=clientes)
         estado_sel = st.multiselect("Estado", options=estados)
         cidade_sel = st.multiselect("Cidade", options=cidades)
         produto_sel = st.multiselect("Produto", options=produtos)
+        
+        if grupos:
+            grupo_sel = st.multiselect("Grupo de Produto", options=grupos)
+        else:
+            grupo_sel = []
+        
+        if cores:
+            cor_sel = st.multiselect("Cor", options=cores)
+        else:
+            cor_sel = []
+        
+        if tamanhos:
+            tamanho_sel = st.multiselect("Tamanho", options=tamanhos)
+        else:
+            tamanho_sel = []
+        
         frete_sel = st.multiselect("Frete", options=fretes)
 
         st.markdown("---")
@@ -1451,6 +1476,12 @@ def main() -> None:
         mask &= df["cidade"].isin(cidade_sel)
     if produto_sel:
         mask &= df["descricao_produto"].isin(produto_sel)
+    if grupo_sel and "grupo_produto" in df.columns:
+        mask &= df["grupo_produto"].isin(grupo_sel)
+    if cor_sel and "cor" in df.columns:
+        mask &= df["cor"].isin(cor_sel)
+    if tamanho_sel and "tamanho" in df.columns:
+        mask &= df["tamanho"].isin(tamanho_sel)
     if frete_sel:
         mask &= df["frete"].isin(frete_sel)
 

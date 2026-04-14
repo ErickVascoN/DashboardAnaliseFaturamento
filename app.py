@@ -1250,6 +1250,10 @@ def main() -> None:
         refresh_click = st.button("Atualizar dados agora", use_container_width=True)
         modo_apresentacao = st.toggle("Modo Apresentação", value=False)
         st.caption("Atualização automática em cache a cada 5 minutos.")
+        
+        # Debug: Mostrar colunas disponíveis
+        with st.expander("🔧 Debug - Colunas Disponíveis"):
+            st.caption("Para diagnosticar problemas com filtros")
 
     if refresh_click:
         st.cache_data.clear()
@@ -1263,6 +1267,27 @@ def main() -> None:
     if df.empty:
         st.warning("A planilha não retornou dados válidos no recorte atual.")
         st.stop()
+
+    # Debug: Mostrar colunas disponíveis para diagnosticar filtros faltantes
+    with st.expander("🔧 Colunas Disponíveis (Debug)"):
+        st.code(f"Colunas carregadas: {list(df.columns)}", language="python")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Total de Colunas", len(df.columns))
+            st.metric("Total de Linhas", len(df))
+        with col2:
+            if "grupo_produto" in df.columns:
+                st.success("✅ grupo_produto encontrada")
+            else:
+                st.warning("❌ grupo_produto não encontrada")
+            if "cor" in df.columns:
+                st.success("✅ cor encontrada")
+            else:
+                st.warning("❌ cor não encontrada")
+            if "tamanho" in df.columns:
+                st.success("✅ tamanho encontrada")
+            else:
+                st.warning("❌ tamanho não encontrada")
 
     data_min = df["data_emissao"].min().date()
     data_max = df["data_emissao"].max().date()

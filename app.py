@@ -16,7 +16,7 @@ from plotly.subplots import make_subplots
 import requests
 import streamlit as st
 
-DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1tpQmqkinlA4AscPI8kIkmm5DGD9Jw_wHb-5sy5itSGg/edit?gid=1149526076#gid=1149526076"
+DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/1tpQmqkinlA4AscPI8kIkmm5DGD9Jw_wHb-5sy5itSGg/edit?gid=1255712550#gid=1255712550"
 CACHE_TTL_SECONDS = 300
 
 COLORS = {
@@ -351,6 +351,8 @@ def inject_styles() -> None:
 
 
 def normalize_text(value: str) -> str:
+    # Converter para string e remover NaN/None
+    value = str(value).strip() if pd.notna(value) else ""
     normalized = unicodedata.normalize("NFKD", value)
     ascii_text = normalized.encode("ascii", "ignore").decode("ascii")
     ascii_text = ascii_text.lower().strip()
@@ -551,7 +553,7 @@ def categorize_product(product_name: str) -> str:
     if not product_name:
         return "Outros"
     
-    name = normalize_text(product_name).upper()
+    name = normalize_text(str(product_name).strip()).upper()
     
     # Mapeamento de palavras-chave → categoria
     mapping = {
@@ -578,7 +580,9 @@ def categorize_product(product_name: str) -> str:
 def canonical_column_names(columns: list[str]) -> dict[str, str]:
     renamed: dict[str, str] = {}
     for original in columns:
-        key = normalize_text(original)
+        # Converter para string (caso seja NaN/float)
+        original_str = str(original).strip() if pd.notna(original) else ""
+        key = normalize_text(original_str)
 
         if "data" in key and "emiss" in key:
             renamed[original] = "data_emissao"
@@ -1360,10 +1364,6 @@ def main() -> None:
         refresh_click = st.button("Atualizar dados agora", use_container_width=True)
         modo_apresentacao = st.toggle("Modo Apresentação", value=False)
         st.caption("Atualização automática em cache a cada 5 minutos.")
-        
-        # Debug: Mostrar colunas disponíveis
-        with st.expander("🔧 Debug - Colunas Disponíveis"):
-            st.caption("Para diagnosticar problemas com filtros")
 
     if refresh_click:
         st.cache_data.clear()
@@ -1391,26 +1391,44 @@ def main() -> None:
     # Callbacks para cascata de filtros
     def _on_ano_change():
         """Reset dependências quando Ano muda"""
-        for k in ("filtro_mes", "filtro_modo", "filtro_dia_unico", "filtro_data_ini", "filtro_data_fim"):
+        for k in ("filtro_mes", "filtro_data_ini", "filtro_data_fim"):
             st.session_state.pop(k, None)
     
     def _on_mes_change():
         """Reset dependências quando Mês muda"""
-        for k in ("filtro_modo", "filtro_dia_unico", "filtro_data_ini", "filtro_data_fim"):
+        for k in ("filtro_data_ini", "filtro_data_fim"):
             st.session_state.pop(k, None)
 
     with st.sidebar:
         st.markdown("---")
+        
+        # Debug: Mostrar informações do dataset (agora após df ser carregado)
+        with st.expander("🔧 Debug - Informações do Dataset"):
+            debug_info = f"""
+            **Tamanho do Dataset:**
+            - Total de linhas: {len(df):,}
+            - Colunas: {len(df.columns)}
+            
+            **Range de Datas:**
+            - De: {df['data_emissao'].min()}
+            - Até: {df['data_emissao'].max()}
+            
+            **Valores Únicos Principais:**
+            - Anos: {df['ano_filtro'].nunique()}
+            - Clientes: {df['destinatario'].nunique()}
+            - Produtos: {df['descricao_produto'].nunique()}
+            - Estados: {df['estado'].nunique()}
+            """
+            st.markdown(debug_info)
+        
+        st.markdown("---")
         st.subheader("Filtros de Data")
         
-        # Filtro 1: Seleção de Anos
-        if "filtro_ano" not in st.session_state:
-            st.session_state["filtro_ano"] = anos_disponiveis
-        
+        # Filtro simplificado: anos + meses com range automático de datas
         anos_sel = st.multiselect(
             "Anos",
             options=anos_disponiveis,
-            default=st.session_state["filtro_ano"],
+            default=anos_disponiveis,
             key="filtro_ano",
             on_change=_on_ano_change,
         )
@@ -1422,20 +1440,13 @@ def main() -> None:
             df[df["ano_filtro"].isin(anos_sel)]["mes_filtro"].unique().tolist()
         )
         
-        if "filtro_mes" not in st.session_state:
-            st.session_state["filtro_mes"] = meses_disponiveis
-        else:
-            # Validar que meses selecionados ainda existem nos anos selecionados
-            valid_meses = set(meses_disponiveis)
-            st.session_state["filtro_mes"] = [m for m in st.session_state["filtro_mes"] if m in valid_meses]
-        
         MESES_NOMES = {1: "Jan", 2: "Fev", 3: "Mar", 4: "Abr", 5: "Mai", 6: "Jun",
                        7: "Jul", 8: "Ago", 9: "Set", 10: "Out", 11: "Nov", 12: "Dez"}
         
         meses_sel = st.multiselect(
             "Meses",
             options=meses_disponiveis,
-            default=st.session_state["filtro_mes"],
+            default=meses_disponiveis,
             format_func=lambda m: MESES_NOMES.get(m, f"Mês {m}"),
             key="filtro_mes",
             on_change=_on_mes_change,
@@ -1453,58 +1464,26 @@ def main() -> None:
             d_min_filt = data_min
             d_max_filt = data_max
         
-        # Filtro 3: Modo de Filtro (Um dia vs Período)
-        modo_sel = st.radio(
-            "Tipo de filtro",
-            ["Período", "Um dia"],
-            horizontal=True,
-            key="filtro_modo",
-        )
-        
-        # Validação e clamping de session_state
-        for key_name, default_val in [("filtro_dia_unico", d_max_filt), 
-                                       ("filtro_data_ini", d_min_filt), 
-                                       ("filtro_data_fim", d_max_filt)]:
-            if key_name not in st.session_state:
-                st.session_state[key_name] = default_val
-            else:
-                val = st.session_state[key_name]
-                if val < d_min_filt:
-                    st.session_state[key_name] = d_min_filt
-                elif val > d_max_filt:
-                    st.session_state[key_name] = d_max_filt
-        
-        # Filtro 4: Seleção de Data (Um dia ou Período)
-        if modo_sel == "Um dia":
+        # Seleção de Data Simplificada (Período)
+        col_ini, col_fim = st.columns(2)
+        with col_ini:
             data_inicial = st.date_input(
-                "Data",
-                value=st.session_state.get("filtro_dia_unico", d_max_filt),
+                "Início",
+                value=st.session_state.get("filtro_data_ini", d_min_filt),
                 min_value=d_min_filt,
                 max_value=d_max_filt,
                 format="DD/MM/YYYY",
-                key="filtro_dia_unico",
+                key="filtro_data_ini",
             )
-            data_final = data_inicial
-        else:
-            col_ini, col_fim = st.columns(2)
-            with col_ini:
-                data_inicial = st.date_input(
-                    "Início",
-                    value=st.session_state.get("filtro_data_ini", d_min_filt),
-                    min_value=d_min_filt,
-                    max_value=d_max_filt,
-                    format="DD/MM/YYYY",
-                    key="filtro_data_ini",
-                )
-            with col_fim:
-                data_final = st.date_input(
-                    "Fim",
-                    value=st.session_state.get("filtro_data_fim", d_max_filt),
-                    min_value=d_min_filt,
-                    max_value=d_max_filt,
-                    format="DD/MM/YYYY",
-                    key="filtro_data_fim",
-                )
+        with col_fim:
+            data_final = st.date_input(
+                "Fim",
+                value=st.session_state.get("filtro_data_fim", d_max_filt),
+                min_value=d_min_filt,
+                max_value=d_max_filt,
+                format="DD/MM/YYYY",
+                key="filtro_data_fim",
+            )
         
         # Garantir que data_inicial <= data_final
         if data_inicial > data_final:
@@ -1532,7 +1511,6 @@ def main() -> None:
 
         clientes = sorted(df["destinatario"].dropna().unique().tolist())
         estados = sorted(df["estado"].dropna().unique().tolist())
-        cidades = sorted(df["cidade"].dropna().unique().tolist())
         produtos = sorted(df["descricao_produto"].dropna().unique().tolist())
         fretes = sorted(df["frete"].dropna().unique().tolist())
         grupos = sorted(df["grupo_produto"].dropna().unique().tolist())
@@ -1541,6 +1519,13 @@ def main() -> None:
 
         cliente_sel = st.multiselect("Cliente", options=clientes)
         estado_sel = st.multiselect("Estado", options=estados)
+        
+        # Cascatear cidade de estado (Bug fix)
+        if estado_sel:
+            cidades = sorted(df[df["estado"].isin(estado_sel)]["cidade"].dropna().unique().tolist())
+        else:
+            cidades = sorted(df["cidade"].dropna().unique().tolist())
+        
         cidade_sel = st.multiselect("Cidade", options=cidades)
         
         # Seleção de grupo (ANTES de produtos)
@@ -1595,6 +1580,34 @@ def main() -> None:
         st.metric("Meta Mensal", to_brl(meta_mensal))
         
         limite_cliente = st.slider("Alerta concentração por cliente", min_value=20, max_value=90, value=45, step=1) / 100
+        
+        # Botão limpar filtros + indicador de filtros ativos
+        st.markdown("---")
+        col_clear, col_indicator = st.columns([1, 2])
+        
+        with col_clear:
+            if st.button("🗑️ Limpar Filtros", use_container_width=True):
+                for key in list(st.session_state.keys()):
+                    if key.startswith("filtro_"):
+                        st.session_state.pop(key, None)
+                st.rerun()
+        
+        # Indicador de filtros ativos
+        filtros_ativos = sum([
+            len(cliente_sel) > 0,
+            len(estado_sel) > 0,
+            len(cidade_sel) > 0,
+            len(grupo_sel) > 0,
+            len(produto_sel) > 0,
+            len(tamanho_sel) > 0,
+            len(cor_sel) > 0,
+            len(frete_sel) > 0,
+            (data_inicial != d_min_filt or data_final != d_max_filt),
+        ])
+        
+        with col_indicator:
+            if filtros_ativos > 0:
+                st.info(f"✓ {filtros_ativos} filtro(s) ativo(s)")
 
     start_date = pd.Timestamp(data_inicial)
     end_date = pd.Timestamp(data_final)
@@ -1603,7 +1616,11 @@ def main() -> None:
         st.error("A data inicial não pode ser maior que a data final.")
         st.stop()
 
+    # Filtro com todos os campos corretos (Bug fix: incluir ano/mês e cascatear corretamente)
     mask = (df["data_emissao"] >= start_date) & (df["data_emissao"] <= end_date)
+    mask &= df["ano_filtro"].isin(anos_sel)
+    mask &= df["mes_filtro"].isin(meses_sel)
+    
     if cliente_sel:
         mask &= df["destinatario"].isin(cliente_sel)
     if estado_sel:
